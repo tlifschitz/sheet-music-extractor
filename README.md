@@ -55,9 +55,16 @@ The PDF lands in `sheets/` and opens automatically.
 | `-o DIR` | output directory (default `sheets/`) |
 | `--no-open` | do not open the PDF when finished |
 
-`youtube.py` is a small helper for fetching source videos: it lists a channel
-with `scrapetube`, filters by random sample or title regex, and downloads your
-pick with `pytubefix`.
+`youtube.py` fetches source videos via `yt-dlp` — either a single URL, or a
+channel filtered by title regex or random sample:
+
+```bash
+venv/bin/python youtube.py "https://www.youtube.com/watch?v=<id>"
+venv/bin/python youtube.py @SomeChannel --limit 50 --match "beatles" --list
+```
+
+Only the video stream is downloaded by default; the pipeline reads frames and
+never touches the audio.
 
 ## Limitations
 

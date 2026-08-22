@@ -4,7 +4,6 @@ numpy==2.2.6
 pillow==11.2.1
 matplotlib==3.10.3
 
-# Video download helper (youtube.py)
-pytubefix==9.1.1
-scrapetube==2.5.1
-tqdm==4.67.1
+# Video download helper (youtube.py). Deliberately not pinned: YouTube changes
+# its extraction surface often and an old yt-dlp simply stops working.
+yt-dlp>=2026.8.19

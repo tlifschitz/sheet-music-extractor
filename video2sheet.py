@@ -208,13 +208,16 @@ def build_pages(bars, title):
     return pages
 
 
+def pad_to_a4(page):
+    """Pad a short page with white so every sheet prints as a full A4."""
+    if page.shape[0] >= A4_HEIGHT_PX:
+        return page
+    pad = A4_HEIGHT_PX - page.shape[0]
+    return np.pad(page, ((0, pad), (0, 0)), mode="constant", constant_values=255)
+
+
 def save_pdf(pages, output_path):
-    images = []
-    for page in pages:
-        if page.shape[0] < A4_HEIGHT_PX:
-            pad = A4_HEIGHT_PX - page.shape[0]
-            page = np.pad(page, ((0, pad), (0, 0)), mode="constant", constant_values=255)
-        images.append(Image.fromarray(page).convert("RGB"))
+    images = [Image.fromarray(pad_to_a4(page)).convert("RGB") for page in pages]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     images[0].save(output_path, save_all=True, append_images=images[1:])

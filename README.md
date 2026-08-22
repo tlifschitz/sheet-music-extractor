@@ -40,10 +40,21 @@ The pipeline solves this with timing rather than inpainting:
    has the cursor in it. `hstack`-ing the two halves reconstructs one complete,
    cursor-free staff line. This is the whole trick.
 
+   ![The detector running, highlighting each half as it is captured](docs/detector.gif)
+
+   *Each half lights up at the moment it is grabbed — the right one while the
+   playhead is still on the left, the left one once it has moved past.*
+
 4. **Lay out pages.** Staff lines are scaled to A4 width at 300 DPI and stacked
    until the next one would overflow the page, then a new page starts.
 
-A four-minute video takes about seven seconds to process.
+Throughput is roughly 160 frames/second at 1080p and 1400 at 360p — the work
+scales with pixel count. A four-minute clip takes anywhere from 6 seconds to a
+minute and a half, depending on its resolution and frame rate.
+
+For the reasoning behind the design — why inpainting and frame compositing
+both fail here, why the thresholds are asymmetric, and where the technique
+breaks — see [**The split-capture trick**](docs/the-split-capture-trick.md).
 
 ## Usage
 

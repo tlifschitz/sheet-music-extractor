@@ -48,7 +48,7 @@ class TestBuildPages:
         """A narrow input is upscaled, keeping its aspect ratio."""
         narrow = [np.full((100, 400), 255, np.uint8)]
         page = v.build_pages(narrow, "Title")[0]
-        expected = v.TOP_BOTTOM_MARGIN_PX + int(100 * (v.A4_WIDTH_PX / 400))
+        expected = v.TITLE_BLOCK_HEIGHT_PX + int(100 * (v.A4_WIDTH_PX / 400))
         assert page.shape == (expected, v.A4_WIDTH_PX)
 
     @pytest.mark.parametrize("count", [1, 5, 23, 100])
@@ -56,8 +56,9 @@ class TestBuildPages:
         """No staff line may be silently dropped at a page break."""
         pages = v.build_pages(staff_lines(count), "Title")
         line_height = int(300 * (v.A4_WIDTH_PX / 1200))
-        margins = v.TOP_BOTTOM_MARGIN_PX * len(pages)
-        assert sum(p.shape[0] for p in pages) - margins == count * line_height
+        # The first page opens with the title block, the rest with a margin.
+        headers = v.TITLE_BLOCK_HEIGHT_PX + v.TOP_BOTTOM_MARGIN_PX * (len(pages) - 1)
+        assert sum(p.shape[0] for p in pages) - headers == count * line_height
 
 
 class TestSavePdf:

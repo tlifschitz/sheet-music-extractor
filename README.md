@@ -49,6 +49,11 @@ venv/bin/python video2sheet.py "videos/Some Tutorial.mp4"
 
 The PDF lands in `sheets/` and opens automatically.
 
+The heading is derived from the filename: `Coldplay - Yellow - Piano Tutorial
+with Sheet Music` becomes a *Yellow* title with *Coldplay* underneath, with the
+tutorial boilerplate dropped. Pass `--title`/`--artist` when that guess is
+wrong. Multi-page scores are numbered in the bottom margin.
+
 | Flag | |
 |---|---|
 | `--show` | live detector overlay while it runs; `q` aborts |
@@ -56,6 +61,7 @@ The PDF lands in `sheets/` and opens automatically.
 | `--dump-bars DIR` | also write each captured staff line as a PNG |
 | `-o DIR` | output directory (default `sheets/`) |
 | `--no-open` | do not open the PDF when finished |
+| `--title` / `--artist` | override the heading, when the filename does not parse cleanly |
 
 `youtube.py` fetches source videos via `yt-dlp` — either a single URL, or a
 channel filtered by title regex or random sample:

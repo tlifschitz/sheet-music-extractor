@@ -11,12 +11,14 @@ the right. Stitching the two halves gives a clean, cursor-free staff image.
 """
 
 import argparse
+import re
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 # --- Tuning constants -------------------------------------------------------
 # These are fitted to one channel's video layout. When extraction fails on a
@@ -36,6 +38,25 @@ BOUNDARY_JITTER_TOLERANCE = 10
 A4_WIDTH_PX = 2480  # A4 at 300 DPI
 A4_HEIGHT_PX = 3508
 TOP_BOTTOM_MARGIN_PX = 200
+
+# --- Title block ------------------------------------------------------------
+TITLE_BLOCK_HEIGHT_PX = 360  # taller than a plain margin: it holds the heading
+TITLE_SIZE_PX = 112
+ARTIST_SIZE_PX = 54
+PAGE_NUMBER_SIZE_PX = 34
+TITLE_MAX_WIDTH_RATIO = 0.86  # shrink the title rather than let it run to the edge
+ARTIST_GREY = 90
+
+# Junk that YouTube titles carry and a score should not.
+BOILERPLATE_RE = re.compile(
+    r"(accurate\s+)?piano\s+tutorial.*|with\s+sheet\s+music|\+\s*sheets?|synthesia|"
+    r"\(?official\s+video\)?|tutorial",
+    re.IGNORECASE,
+)
+
+# yt-dlp swaps characters that are illegal in filenames for fullwidth
+# lookalikes; map them back so the heading reads normally.
+FULLWIDTH = str.maketrans({"？": "?", "：": ":", "／": "/", "＂": '"', "＊": "*", "｜": "|", "＜": "<", "＞": ">"})
 
 
 def get_bar_position(frame, kernel_size):
@@ -173,31 +194,118 @@ def extract_bars(video_path, show=False, dump_dir=None):
     return bars, trace
 
 
-def build_pages(bars, title):
-    """Scale staff lines to A4 width and stack them into full pages."""
+@lru_cache(maxsize=None)
+def _font(size, bold=False):
+    """A serif face that is identical on every platform.
+
+    matplotlib ships DejaVu, so this needs no system font lookup and renders
+    the same way locally and in CI. Falls back to Pillow's built-in scalable
+    font if matplotlib is not installed.
+    """
+    try:
+        import matplotlib
+
+        name = "DejaVuSerif-Bold.ttf" if bold else "DejaVuSerif.ttf"
+        path = Path(matplotlib.__file__).parent / "mpl-data" / "fonts" / "ttf" / name
+        return ImageFont.truetype(str(path), size)
+    except Exception:
+        return ImageFont.load_default(size=size)
+
+
+def split_title(stem):
+    """Turn a downloaded filename into (title, artist).
+
+    "Billie Eilish - What Was I Made For？ - Accurate Piano Tutorial with
+    Sheet Music" becomes ("What Was I Made For?", "Billie Eilish"). Anything
+    that does not look like "artist - song - boilerplate" is passed through
+    unchanged as the title, with no artist line.
+    """
+    stem = stem.translate(FULLWIDTH)
+    parts = [p.strip() for p in stem.split(" - ")]
+    parts = [p for p in parts if p and not BOILERPLATE_RE.fullmatch(p.strip())]
+
+    if len(parts) >= 2:
+        return " - ".join(parts[1:]), parts[0]
+    if len(parts) == 1:
+        return parts[0], None
+    return stem, None
+
+
+def _draw_centred(draw, text, font, y, width, fill=0):
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    draw.text(((width - (right - left)) // 2 - left, y - top), text, font=font, fill=fill)
+    return bottom - top
+
+
+def _fitted_font(draw, text, size, bold, max_width):
+    """Shrink the type until the line fits, rather than letting it overflow."""
+    while size > 24:
+        font = _font(size, bold)
+        left, _, right, _ = draw.textbbox((0, 0), text, font=font)
+        if right - left <= max_width:
+            return font
+        size -= 4
+    return _font(size, bold)
+
+
+def make_title_block(title, artist=None):
+    """Render the heading that opens the score."""
+    block = Image.new("L", (A4_WIDTH_PX, TITLE_BLOCK_HEIGHT_PX), 255)
+    draw = ImageDraw.Draw(block)
+    max_width = int(A4_WIDTH_PX * TITLE_MAX_WIDTH_RATIO)
+
+    font = _fitted_font(draw, title, TITLE_SIZE_PX, True, max_width)
+    title_height = _draw_centred(draw, title, font, TITLE_BLOCK_HEIGHT_PX // 3, A4_WIDTH_PX)
+
+    if artist:
+        font = _fitted_font(draw, artist, ARTIST_SIZE_PX, False, max_width)
+        _draw_centred(
+            draw,
+            artist,
+            font,
+            TITLE_BLOCK_HEIGHT_PX // 3 + title_height + 46,
+            A4_WIDTH_PX,
+            fill=ARTIST_GREY,
+        )
+
+    return np.asarray(block)
+
+
+def add_page_number(page, number, total):
+    """Stamp "n / total" into the bottom margin."""
+    if total < 2:
+        return page
+    img = Image.fromarray(page)
+    draw = ImageDraw.Draw(img)
+    _draw_centred(
+        draw,
+        f"{number} / {total}",
+        _font(PAGE_NUMBER_SIZE_PX),
+        A4_HEIGHT_PX - TOP_BOTTOM_MARGIN_PX // 2,
+        A4_WIDTH_PX,
+        fill=ARTIST_GREY,
+    )
+    return np.asarray(img)
+
+
+def build_pages(bars, title, artist=None):
+    """Scale staff lines to A4 width and stack them into pages."""
     resized = []
     for bar in bars:
         h, w = bar.shape
         new_h = int(h * (A4_WIDTH_PX / w))
         resized.append(cv2.resize(bar, (A4_WIDTH_PX, new_h), interpolation=cv2.INTER_LINEAR))
 
-    title_bar = np.ones((TOP_BOTTOM_MARGIN_PX, A4_WIDTH_PX), dtype=np.uint8) * 255
-    font, font_scale, font_thickness = cv2.FONT_HERSHEY_PLAIN, 2, 3
-    text_size = cv2.getTextSize(title, font, font_scale, font_thickness)[0]
-    text_x = (A4_WIDTH_PX - text_size[0]) // 2
-    text_y = (TOP_BOTTOM_MARGIN_PX + text_size[1]) // 2
-    cv2.putText(
-        title_bar, title, (text_x, text_y), font, font_scale, (0,), font_thickness, cv2.LINE_AA
-    )
+    title_block = make_title_block(title, artist)
 
     pages = []
-    current_page = [title_bar]
-    current_height = TOP_BOTTOM_MARGIN_PX
+    current_page = [title_block]
+    current_height = title_block.shape[0]
 
     for bar in resized:
         if current_height + bar.shape[0] > A4_HEIGHT_PX - TOP_BOTTOM_MARGIN_PX and current_page:
             pages.append(np.vstack(current_page))
-            current_page = [np.ones((TOP_BOTTOM_MARGIN_PX, A4_WIDTH_PX), dtype=np.uint8) * 255]
+            current_page = [np.full((TOP_BOTTOM_MARGIN_PX, A4_WIDTH_PX), 255, np.uint8)]
             current_height = TOP_BOTTOM_MARGIN_PX
         current_page.append(bar)
         current_height += bar.shape[0]
@@ -217,7 +325,10 @@ def pad_to_a4(page):
 
 
 def save_pdf(pages, output_path):
-    images = [Image.fromarray(pad_to_a4(page)).convert("RGB") for page in pages]
+    images = [
+        Image.fromarray(add_page_number(pad_to_a4(page), i, len(pages))).convert("RGB")
+        for i, page in enumerate(pages, 1)
+    ]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     images[0].save(output_path, save_all=True, append_images=images[1:])
@@ -246,6 +357,8 @@ def main():
     parser.add_argument("--show", action="store_true", help="live detector overlay; q to abort")
     parser.add_argument("--plot", action="store_true", help="plot playhead position afterwards")
     parser.add_argument("--no-open", action="store_true", help="do not open the PDF when done")
+    parser.add_argument("--title", help="override the heading (default: parsed from the filename)")
+    parser.add_argument("--artist", help="override the artist line under the heading")
     parser.add_argument(
         "--dump-bars",
         type=Path,
@@ -269,9 +382,12 @@ def main():
             "do not match this video's layout. Re-run with --show to diagnose."
         )
 
-    title = args.video.stem
-    output_path = args.output_dir / f"{title}.pdf"
-    pages = build_pages(bars, title)
+    parsed_title, parsed_artist = split_title(args.video.stem)
+    title = args.title or parsed_title
+    artist = args.artist if args.artist is not None else parsed_artist
+
+    output_path = args.output_dir / f"{args.video.stem}.pdf"
+    pages = build_pages(bars, title, artist)
     save_pdf(pages, output_path)
     print(f"Wrote {len(pages)} page(s) from {len(bars)} staff lines to {output_path}")
 

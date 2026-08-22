@@ -1,9 +1,11 @@
-# Core pipeline
-opencv-python==4.11.0.86
-numpy==2.2.6
-pillow==11.2.1
-matplotlib==3.10.3
+# Lower bounds rather than exact pins: this is a small script with a stable
+# API surface, and it is verified to run on both the 4.x/py3.13 and the
+# 5.x/py3.14 stacks. Exact pins age into an uninstallable project.
 
-# Video download helper (youtube.py). Deliberately not pinned: YouTube changes
-# its extraction surface often and an old yt-dlp simply stops working.
+opencv-python>=4.11
+numpy>=2.2
+pillow>=11
+matplotlib>=3.10          # only needed for --plot and experiments/
+
+# YouTube changes its extraction surface often; a stale yt-dlp stops working.
 yt-dlp>=2026.8.19

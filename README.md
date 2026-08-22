@@ -66,6 +66,19 @@ venv/bin/python youtube.py @SomeChannel --limit 50 --match "beatles" --list
 Only the video stream is downloaded by default; the pipeline reads frames and
 never touches the audio.
 
+## Tests
+
+```bash
+venv/bin/python -m pip install -r requirements-dev.txt
+venv/bin/pytest -q
+```
+
+The detector is covered by synthetic frames built with numpy — a white block
+over a dark one for the staff boundary, a single saturated column for the
+playhead — so the suite needs no video fixtures and runs in under a second.
+The page-layout arithmetic and the URL handling in `youtube.py` are covered
+the same way.
+
 ## Limitations
 
 The detector is fitted to one channel's video layout — staff on top, notes

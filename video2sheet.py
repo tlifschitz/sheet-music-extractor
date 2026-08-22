@@ -37,13 +37,18 @@ BOUNDARY_JITTER_TOLERANCE = 10
 # --- Page layout ------------------------------------------------------------
 A4_WIDTH_PX = 2480  # A4 at 300 DPI
 A4_HEIGHT_PX = 3508
-TOP_BOTTOM_MARGIN_PX = 200
+TOP_MARGIN_PX = 200
+# The foot of the page carries only the page number, so it needs less room
+# than the head. Tying both to one constant used to reject a staff line that
+# missed the reserve by a few millimetres.
+BOTTOM_MARGIN_PX = 170
 
 # --- Title block ------------------------------------------------------------
 TITLE_BLOCK_HEIGHT_PX = 360  # taller than a plain margin: it holds the heading
 TITLE_SIZE_PX = 112
 ARTIST_SIZE_PX = 54
 PAGE_NUMBER_SIZE_PX = 34
+MAX_EXTRA_GAP_PX = 130  # ceiling on justification, so sparse pages do not sprawl
 TITLE_MAX_WIDTH_RATIO = 0.86  # shrink the title rather than let it run to the edge
 ARTIST_GREY = 90
 
@@ -281,37 +286,128 @@ def add_page_number(page, number, total):
         draw,
         f"{number} / {total}",
         _font(PAGE_NUMBER_SIZE_PX),
-        A4_HEIGHT_PX - TOP_BOTTOM_MARGIN_PX // 2,
+        A4_HEIGHT_PX - BOTTOM_MARGIN_PX // 2,
         A4_WIDTH_PX,
         fill=ARTIST_GREY,
     )
     return np.asarray(img)
 
 
-def build_pages(bars, title, artist=None):
-    """Scale staff lines to A4 width and stack them into pages."""
+def _pack(heights, first_start, rest_start, max_lines=None):
+    """Greedily fill pages, returning how many staff lines land on each.
+
+    `max_lines` optionally caps the lines per page, which is what lets the
+    balancing pass even the pages out.
+    """
+    limit = A4_HEIGHT_PX - BOTTOM_MARGIN_PX
+    pages, count, height = [], 0, first_start
+
+    for h in heights:
+        overflows = height + h > limit
+        at_cap = max_lines is not None and count >= max_lines
+        if (overflows or at_cap) and count:
+            pages.append(count)
+            count, height = 0, rest_start
+        count += 1
+        height += h
+
+    if count:
+        pages.append(count)
+    return pages
+
+
+def _fits(counts, heights, first_start, rest_start):
+    """Would this split actually fit on the pages?"""
+    limit = A4_HEIGHT_PX - BOTTOM_MARGIN_PX
+    index = 0
+    for page_number, count in enumerate(counts):
+        start = first_start if page_number == 0 else rest_start
+        if start + sum(heights[index : index + count]) > limit:
+            return False
+        index += count
+    return True
+
+
+def _balanced(heights, first_start, rest_start):
+    """Spread the staff lines evenly, without spending an extra page.
+
+    Plain greedy packing crams the early pages and leaves the last one nearly
+    empty (6/6/3 for fifteen lines). This divides them as evenly as the page
+    count allows (5/5/5), falling back to greedy if that does not fit.
+    """
+    pages = _pack(heights, first_start, rest_start)
+    if len(pages) < 2:
+        return pages
+
+    base, extra = divmod(len(heights), len(pages))
+    # The first page is shorter than the rest, since it carries the title, so
+    # try handing the extra lines to the later pages first.
+    for counts in ([base] * (len(pages) - extra) + [base + 1] * extra,
+                   [base + 1] * extra + [base] * (len(pages) - extra)):
+        if all(counts) and _fits(counts, heights, first_start, rest_start):
+            return counts
+
+    target = -(-len(heights) // len(pages))  # ceil
+    for cap in range(target, max(pages) + 1):
+        candidate = _pack(heights, first_start, rest_start, cap)
+        if len(candidate) == len(pages):
+            return candidate
+    return pages
+
+
+def _justify(head, lines):
+    """Spread the leftover height between the staff lines.
+
+    Balancing decides how many lines land on each page; without this the
+    slack all collects at the foot and reads as a line that failed to fit.
+    Engraved scores distribute it between the systems instead.
+    """
+    blocks = [head] + lines
+    if len(lines) < 2:
+        return np.vstack(blocks)
+
+    used = head.shape[0] + sum(line.shape[0] for line in lines)
+    slack = A4_HEIGHT_PX - BOTTOM_MARGIN_PX - used
+    gap = min(max(slack // (len(lines) - 1), 0), MAX_EXTRA_GAP_PX)
+    if gap == 0:
+        return np.vstack(blocks)
+
+    spacer = np.full((gap, A4_WIDTH_PX), 255, np.uint8)
+    stacked = [head, lines[0]]
+    for line in lines[1:]:
+        stacked += [spacer, line]
+    return np.vstack(stacked)
+
+
+def build_pages(bars, title, artist=None, balance=True):
+    """Scale staff lines to A4 width and stack them into pages.
+
+    With `balance` the lines are spread evenly over the pages and the
+    remaining height is distributed between them; without it, pages are
+    packed as full as they go.
+    """
     resized = []
     for bar in bars:
         h, w = bar.shape
         new_h = int(h * (A4_WIDTH_PX / w))
         resized.append(cv2.resize(bar, (A4_WIDTH_PX, new_h), interpolation=cv2.INTER_LINEAR))
 
+    if not resized:
+        return []
+
     title_block = make_title_block(title, artist)
+    heights = [bar.shape[0] for bar in resized]
 
-    pages = []
-    current_page = [title_block]
-    current_height = title_block.shape[0]
+    counts = (_balanced if balance else _pack)(heights, title_block.shape[0], TOP_MARGIN_PX)
 
-    for bar in resized:
-        if current_height + bar.shape[0] > A4_HEIGHT_PX - TOP_BOTTOM_MARGIN_PX and current_page:
-            pages.append(np.vstack(current_page))
-            current_page = [np.full((TOP_BOTTOM_MARGIN_PX, A4_WIDTH_PX), 255, np.uint8)]
-            current_height = TOP_BOTTOM_MARGIN_PX
-        current_page.append(bar)
-        current_height += bar.shape[0]
-
-    if len(current_page) > 1:
-        pages.append(np.vstack(current_page))
+    pages, index = [], 0
+    for page_number, count in enumerate(counts):
+        head = title_block if page_number == 0 else np.full(
+            (TOP_MARGIN_PX, A4_WIDTH_PX), 255, np.uint8
+        )
+        lines = resized[index : index + count]
+        pages.append(_justify(head, lines) if balance else np.vstack([head] + lines))
+        index += count
 
     return pages
 
@@ -357,6 +453,11 @@ def main():
     parser.add_argument("--show", action="store_true", help="live detector overlay; q to abort")
     parser.add_argument("--plot", action="store_true", help="plot playhead position afterwards")
     parser.add_argument("--no-open", action="store_true", help="do not open the PDF when done")
+    parser.add_argument(
+        "--dense",
+        action="store_true",
+        help="pack pages as full as possible instead of spreading lines evenly",
+    )
     parser.add_argument("--title", help="override the heading (default: parsed from the filename)")
     parser.add_argument("--artist", help="override the artist line under the heading")
     parser.add_argument(
@@ -387,7 +488,7 @@ def main():
     artist = args.artist if args.artist is not None else parsed_artist
 
     output_path = args.output_dir / f"{args.video.stem}.pdf"
-    pages = build_pages(bars, title, artist)
+    pages = build_pages(bars, title, artist, balance=not args.dense)
     save_pdf(pages, output_path)
     print(f"Wrote {len(pages)} page(s) from {len(bars)} staff lines to {output_path}")
 

@@ -54,6 +54,11 @@ with Sheet Music` becomes a *Yellow* title with *Coldplay* underneath, with the
 tutorial boilerplate dropped. Pass `--title`/`--artist` when that guess is
 wrong. Multi-page scores are numbered in the bottom margin.
 
+Staff lines are spread evenly across the pages and the leftover height is
+distributed between them, so a page never ends with a gap that looks like a
+line failed to fit. `--dense` turns that off and packs each page as full as
+it goes, which trades even pages for fewer page turns.
+
 | Flag | |
 |---|---|
 | `--show` | live detector overlay while it runs; `q` aborts |
@@ -62,6 +67,7 @@ wrong. Multi-page scores are numbered in the bottom margin.
 | `-o DIR` | output directory (default `sheets/`) |
 | `--no-open` | do not open the PDF when finished |
 | `--title` / `--artist` | override the heading, when the filename does not parse cleanly |
+| `--dense` | pack pages as full as they go, instead of spreading lines evenly |
 
 `youtube.py` fetches source videos via `yt-dlp` — either a single URL, or a
 channel filtered by title regex or random sample:

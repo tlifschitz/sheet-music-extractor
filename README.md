@@ -1,5 +1,7 @@
 # sheet-music-extractor
 
+[![tests](https://github.com/tlifschitz/sheet-music-extractor/actions/workflows/ci.yml/badge.svg)](https://github.com/tlifschitz/sheet-music-extractor/actions/workflows/ci.yml)
+
 Reconstructs a printable PDF score from a piano-tutorial video — the kind that
 scrolls a staff across the top of the frame while notes fall onto a keyboard
 below.

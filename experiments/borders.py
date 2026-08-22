@@ -1,3 +1,5 @@
+import sys
+
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -219,8 +221,9 @@ def main():
     """
     Main function to process sheet music image
     """
-    # Input image path - change this to your image path
-    input_path = "1.png"  # Replace with your image path
+    # Staff image to analyse. Generate one with:
+    #   python video2sheet.py <video> --dump-bars bars/
+    input_path = sys.argv[1] if len(sys.argv) > 1 else "1.png"
 
     try:
         # Read the image

@@ -1,0 +1,22 @@
+# Virtualenv
+venv/
+.venv/
+
+# Large media: inputs and generated scores stay local
+videos/
+sheets/
+*.mp4
+*.pdf
+
+# Intermediate frames dumped by the debug imwrite in video2sheet.py
+*.png
+!docs/*.png
+sheet_frames/
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store

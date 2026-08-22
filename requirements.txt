@@ -1,0 +1,8 @@
+img2pdf==0.6.1
+ipykernel==6.29.5
+ipywidgets==8.1.7
+matplotlib==3.10.3
+opencv-python==4.11.0.86
+scikit-image==0.25.2
+tomli==2.0.1
+tqdm==4.67.1

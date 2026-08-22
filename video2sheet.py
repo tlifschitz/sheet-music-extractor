@@ -140,7 +140,14 @@ def extract_bars(video_path, show=False, dump_dir=None):
             average_corner_brightness, brightness_drop_y = detect_pentagram_boundary(frame)
             if average_corner_brightness > MIN_CORNER_BRIGHTNESS:
                 boundary_y = brightness_drop_y
-                state = 1
+                # Enter at state 3, not 1. If the staff is acquired midway
+                # through a sweep — after a boundary is lost and regained —
+                # a playhead already past both thresholds would arm and fire
+                # in the same frame, stitching two halves grabbed at the same
+                # instant with the cursor sitting in one of them. State 3
+                # waits for the playhead to wrap left first, which costs
+                # nothing when the staff is acquired at the start of a sweep.
+                state = 3
                 print(f"Found pentagram boundary {boundary_y}")
         else:
             average_corner_brightness, current_boundary_y = detect_pentagram_boundary(frame)

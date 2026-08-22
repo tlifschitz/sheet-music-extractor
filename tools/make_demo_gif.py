@@ -48,7 +48,10 @@ def render(video, start, end, step, width, crop_pad, frame_ms, hold_ms):
     th2 = int(round(frame_width * v.PLAYHEAD_FIRE_RATIO))
     mid = frame_width // 2
 
-    state, captured, flash = 1, 0, None
+    # Replay starts mid-video, so begin in state 3: wait for the playhead to
+    # wrap left before arming. Starting in state 1 makes a playhead that is
+    # already past both thresholds fire a spurious capture on frame one.
+    state, captured, flash = 3, 0, None
     frames, durations = [], []
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, start)

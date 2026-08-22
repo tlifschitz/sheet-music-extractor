@@ -16,6 +16,13 @@ The hard part is not reading the staff — it is already a clean, high-contrast
 render. The hard part is that a coloured playhead sits on top of the music, and
 any single frame you grab has the cursor smeared across it.
 
+![The detector running, highlighting each half of the staff as it is captured](docs/detector.gif)
+
+*Black: the two capture thresholds. Red: the tracked playhead, and the staff
+boundary separating the music from the falling notes below. Each half lights
+up at the moment it is grabbed — the right one while the playhead is still on
+the left, the left one once it has moved past.*
+
 The pipeline solves this with timing rather than inpainting:
 
 1. **Find the staff.** A narrow strip at the left edge of the frame is checked
@@ -29,21 +36,11 @@ The pipeline solves this with timing rather than inpainting:
    column with peak mean saturation locates it in one pass, with no template
    matching or colour range to tune per video.
 
-   ![The detector running: threshold lines in black, playhead and staff boundary in red](docs/demo.png)
-
-   *Black: the two capture thresholds. Red: the tracked playhead, and the
-   staff boundary separating the music from the falling notes below it.*
-
 3. **Capture each half at the right moment.** As the playhead sweeps left to
    right, the **right** half of the staff is saved once the cursor passes 25% of
    the frame width, and the **left** half once it passes 85%. Neither capture
    has the cursor in it. `hstack`-ing the two halves reconstructs one complete,
    cursor-free staff line. This is the whole trick.
-
-   ![The detector running, highlighting each half as it is captured](docs/detector.gif)
-
-   *Each half lights up at the moment it is grabbed — the right one while the
-   playhead is still on the left, the left one once it has moved past.*
 
 4. **Lay out pages.** Staff lines are scaled to A4 width at 300 DPI and stacked
    until the next one would overflow the page, then a new page starts.

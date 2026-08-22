@@ -38,7 +38,7 @@ def tint(frame, x0, x1, colour, alpha=0.28):
     frame[:, x0:x1] = cv2.addWeighted(patch, 1 - alpha, wash, alpha, 0)
 
 
-def render(video, start, end, step, width, crop_pad):
+def render(video, start, end, step, width, crop_pad, frame_ms, hold_ms):
     cap = cv2.VideoCapture(str(video))
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     kernel = min(
@@ -49,7 +49,7 @@ def render(video, start, end, step, width, crop_pad):
     mid = frame_width // 2
 
     state, captured, flash = 1, 0, None
-    frames = []
+    frames, durations = [], []
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, start)
     for index in range(start, end):
@@ -71,13 +71,15 @@ def render(video, start, end, step, width, crop_pad):
                 state = 1
 
         if (index - start) % step:
-            if flash:
-                flash = (flash[0], flash[1])
             continue
 
         view = frame[: boundary + crop_pad].copy()
+        duration = frame_ms
         if flash and flash[1] > 0:
             side, left = flash
+            # Hold on the first frame a label appears, so it can be read.
+            if left == FLASH_FRAMES:
+                duration = hold_ms
             if side == "right":
                 tint(view, mid, frame_width, RIGHT_TINT)
                 label(view, "right half captured", (60, 190, 70))
@@ -95,9 +97,10 @@ def render(video, start, end, step, width, crop_pad):
         height = round(view.shape[0] * width / view.shape[1])
         view = cv2.resize(view, (width, height), interpolation=cv2.INTER_AREA)
         frames.append(Image.fromarray(cv2.cvtColor(view, cv2.COLOR_BGR2RGB)))
+        durations.append(duration)
 
     cap.release()
-    return frames
+    return frames, durations
 
 
 def main():
@@ -116,10 +119,19 @@ def main():
         "lyric captions just underneath",
     )
     p.add_argument("--duration", type=int, default=70, help="ms per frame")
+    p.add_argument(
+        "--hold",
+        type=int,
+        default=1000,
+        help="ms to pause on the frame where a capture label appears",
+    )
     p.add_argument("--colors", type=int, default=96)
     args = p.parse_args()
 
-    frames = render(args.video, args.start, args.end, args.step, args.width, args.crop_pad)
+    frames, durations = render(
+        args.video, args.start, args.end, args.step, args.width, args.crop_pad,
+        args.duration, args.hold,
+    )
     if not frames:
         raise SystemExit("No frames rendered; check --start/--end and the video.")
 
@@ -129,13 +141,17 @@ def main():
         args.output,
         save_all=True,
         append_images=frames[1:],
-        duration=args.duration,
+        duration=durations,
         loop=0,
         optimize=True,
         disposal=2,
     )
     size = args.output.stat().st_size / 1024
-    print(f"{args.output}: {len(frames)} frames, {frames[0].size[0]}x{frames[0].size[1]}, {size:.0f} KB")
+    total = sum(durations) / 1000
+    print(
+        f"{args.output}: {len(frames)} frames, {frames[0].size[0]}x{frames[0].size[1]}, "
+        f"{size:.0f} KB, {total:.1f}s ({durations.count(args.hold)} pauses)"
+    )
 
 
 if __name__ == "__main__":

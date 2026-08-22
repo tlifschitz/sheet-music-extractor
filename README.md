@@ -6,7 +6,9 @@ Reconstructs a printable PDF score from a piano-tutorial video — the kind that
 scrolls a staff across the top of the frame while notes fall onto a keyboard
 below.
 
-![The detector running: threshold lines in black, playhead and staff boundary in red](docs/demo.png)
+![Left: a frame of the source video. Right: page one of the score it produces.](docs/before-after.png)
+
+One video in, a printable PDF out.
 
 ## How it works
 
@@ -26,6 +28,11 @@ The pipeline solves this with timing rather than inpainting:
    strongly saturated thing in the crop. Converting to HSV and taking the
    column with peak mean saturation locates it in one pass, with no template
    matching or colour range to tune per video.
+
+   ![The detector running: threshold lines in black, playhead and staff boundary in red](docs/demo.png)
+
+   *Black: the two capture thresholds. Red: the tracked playhead, and the
+   staff boundary separating the music from the falling notes below it.*
 
 3. **Capture each half at the right moment.** As the playhead sweeps left to
    right, the **right** half of the staff is saved once the cursor passes 25% of
@@ -111,8 +118,10 @@ finished.
 ## Note on source material
 
 Piano tutorial videos and the scores derived from them are usually copyrighted.
-This repository contains no videos and no extracted scores — only the code. Use
-it on material you have the right to use.
+This repository ships no videos and no usable scores — only the code. The
+images above are low-resolution illustrations: the page shown is about a
+seventh of print size, far too small to read or play from. Use the tool on
+material you have the right to use.
 
 ## License
 

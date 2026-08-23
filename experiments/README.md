@@ -10,11 +10,10 @@ useful when re-tuning the detector, not because they are finished.
   (`merge_two_lines` currently returns its first argument unchanged).
 
   ```bash
-  python ../video2sheet.py <video> --dump-bars bars/
+  video2sheet <video> --dump-bars bars/
   python borders.py bars/001.png
   ```
 
 - **`tuneblue.py`** — click a pixel in an image to print its HSV value. Used to
-  pick `BAR_POSITION_SATURATION_THRESHOLD` for a new video style. Expects an
-  `output.png` in the working directory; point it at any frame or dumped staff
-  line.
+  pick `BAR_POSITION_SATURATION_THRESHOLD` for a new video style. Drawn with matplotlib, since the project depends on the headless OpenCV
+  build. Point it at any frame or dumped staff line.

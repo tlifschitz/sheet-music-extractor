@@ -53,16 +53,30 @@ For the reasoning behind the design — why inpainting and frame compositing
 both fail here, why the thresholds are asymmetric, and where the technique
 breaks — see [**The split-capture trick**](docs/the-split-capture-trick.md).
 
-## Usage
+## Install
+
+```bash
+pipx install git+https://github.com/tlifschitz/sheet-music-extractor
+```
+
+Or from a clone, for hacking on it:
 
 ```bash
 python -m venv venv
-venv/bin/pip install -r requirements.txt
-
-venv/bin/python video2sheet.py "videos/Some Tutorial.mp4"
+venv/bin/python -m pip install -e ".[dev]"
 ```
 
-The PDF lands in `sheets/` and opens automatically.
+There is no system dependency to install: the project uses the headless
+OpenCV build, so it installs on a bare Linux box the same as on a Mac.
+
+## Usage
+
+```bash
+video2sheet "videos/Some Tutorial.mp4"
+```
+
+The PDF lands in `./sheets/`, created wherever you run the command, and opens
+automatically.
 
 The heading is derived from the filename: `Coldplay - Yellow - Piano Tutorial
 with Sheet Music` becomes a *Yellow* title with *Coldplay* underneath, with the
@@ -76,20 +90,20 @@ it goes, which trades even pages for fewer page turns.
 
 | Flag | |
 |---|---|
-| `--show` | live detector overlay while it runs; `q` aborts |
+| `--debug-gif PATH` | an animated overlay of what the detector saw, to diagnose a video |
 | `--plot` | playhead position over time, to see where tracking broke |
 | `--dump-bars DIR` | also write each captured staff line as a PNG |
-| `-o DIR` | output directory (default `sheets/`) |
+| `-o DIR` | output directory (default `./sheets`, relative to where you run) |
 | `--no-open` | do not open the PDF when finished |
 | `--title` / `--artist` | override the heading, when the filename does not parse cleanly |
 | `--dense` | pack pages as full as they go, instead of spreading lines evenly |
 
-`youtube.py` fetches source videos via `yt-dlp` — either a single URL, or a
-channel filtered by title regex or random sample:
+`video2sheet-fetch` pulls source videos via `yt-dlp` — either a single URL, or
+a channel filtered by title regex or random sample:
 
 ```bash
-venv/bin/python youtube.py "https://www.youtube.com/watch?v=<id>"
-venv/bin/python youtube.py @SomeChannel --limit 50 --match "beatles" --list
+video2sheet-fetch "https://www.youtube.com/watch?v=<id>"
+video2sheet-fetch @SomeChannel --limit 50 --match "beatles" --list
 ```
 
 Only the video stream is downloaded by default; the pipeline reads frames and
@@ -98,22 +112,22 @@ never touches the audio.
 ## Tests
 
 ```bash
-venv/bin/python -m pip install -r requirements-dev.txt
+venv/bin/python -m pip install -e ".[dev]"
 venv/bin/pytest -q
 ```
 
 The detector is covered by synthetic frames built with numpy — a white block
 over a dark one for the staff boundary, a single saturated column for the
 playhead — so the suite needs no video fixtures and runs in under a second.
-The page-layout arithmetic and the URL handling in `youtube.py` are covered
-the same way.
+The page-layout arithmetic and the URL handling in the fetcher are covered the
+same way.
 
 ## Limitations
 
 The detector is fitted to one channel's video layout — staff on top, notes
 below, a saturated playhead, a light background. Videos shaped differently will
 either find no staff boundary or capture nothing, and the constants at the top
-of `video2sheet.py` are where you would adapt it.
+of `sheet_music_extractor/video2sheet.py` are where you would adapt it.
 
 It also reads only what is drawn on screen: no OMR, no MusicXML, no MIDI. The
 output is an image-based PDF, so it is printable but not editable in notation

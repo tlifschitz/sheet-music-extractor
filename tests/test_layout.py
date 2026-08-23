@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-import video2sheet as v
+from sheet_music_extractor import video2sheet as v
 
 MAX_PAGE_HEIGHT = v.A4_HEIGHT_PX - v.BOTTOM_MARGIN_PX
 

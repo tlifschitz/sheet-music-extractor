@@ -20,17 +20,51 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: |
+            requirements*.txt
+            pyproject.toml
 
-      # opencv-python (as opposed to the headless build) links against libGL,
-      # which the GitHub runners do not ship. Without this, `import cv2` fails
-      # before a single test runs.
-      - name: Install system libraries for OpenCV
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libgl1 libglib2.0-0
-
+      # No apt step: opencv-python-headless needs no libGL. That is the whole
+      # reason for the headless build — the same wall a `pipx install` used to
+      # hit on a bare Linux box.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          pip install -e . --no-deps
 
       - name: Run tests
         run: pytest -q
+
+  package:
+    # Single Python on purpose: building four times would refetch OpenCV four
+    # times for a concern that is not version-specific.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Install the wheel into a clean environment
+        run: |
+          python -m venv /tmp/pkgcheck
+          /tmp/pkgcheck/bin/python -m pip install --upgrade pip
+          /tmp/pkgcheck/bin/python -m pip install dist/*.whl
+
+      # Run from outside the checkout, so a passing `--help` proves the wheel
+      # carries the code rather than the source tree shadowing it on sys.path.
+      # It is a real smoke test: --help imports cv2, numpy and PIL before
+      # argparse ever runs, and the fetcher imports yt_dlp.
+      - name: The console scripts work from a clean directory
+        working-directory: /tmp
+        run: |
+          /tmp/pkgcheck/bin/video2sheet --help
+          /tmp/pkgcheck/bin/video2sheet-fetch --help

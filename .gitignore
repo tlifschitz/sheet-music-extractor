@@ -8,7 +8,7 @@ sheets/
 *.mp4
 *.pdf
 
-# Intermediate frames dumped by the debug imwrite in video2sheet.py
+# Intermediate frames dumped by --dump-bars
 *.png
 !docs/*.png
 sheet_frames/
@@ -23,3 +23,9 @@ __pycache__/
 
 # pytest
 .pytest_cache/
+
+# Packaging artefacts
+build/
+dist/
+*.egg-info/
+.eggs/

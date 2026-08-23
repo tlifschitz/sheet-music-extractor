@@ -1,0 +1,57 @@
+[build-system]
+# 77.0.3 is the floor for PEP 639, i.e. `license` as an SPDX string plus
+# `license-files`. Below it the string form is treated as free text.
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sheet-music-extractor"
+version = "0.1.0"
+description = "Reconstruct printable PDF scores from piano-tutorial videos"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Tobias Lifschitz" }]
+keywords = ["opencv", "sheet-music", "piano", "synthesia", "pdf", "video"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Graphics :: Capture",
+    "Topic :: Multimedia :: Video",
+]
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+# Deliberately not read from requirements-dev.txt: its first line is
+# `-r requirements.txt`, which setuptools hands straight to the PEP 508
+# parser and which fails there. One duplicated pin beats a broken build.
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+video2sheet = "sheet_music_extractor.video2sheet:main"
+video2sheet-fetch = "sheet_music_extractor.youtube:main"
+
+[project.urls]
+Homepage = "https://github.com/tlifschitz/sheet-music-extractor"
+Source = "https://github.com/tlifschitz/sheet-music-extractor"
+Issues = "https://github.com/tlifschitz/sheet-music-extractor/issues"
+
+[tool.setuptools]
+# Explicit, not discovered. Flat-layout auto-discovery would see tests/,
+# tools/, experiments/, docs/, videos/, sheets/ and venv/ and hard-error with
+# "Multiple top-level packages discovered in a flat-layout".
+packages = ["sheet_music_extractor"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.pytest.ini_options]
+# Pins the rootdir now that tests/conftest.py no longer anchors it, and keeps
+# collection out of a stray build/ directory.
+testpaths = ["tests"]

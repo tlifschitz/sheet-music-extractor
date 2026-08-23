@@ -1,7 +1,7 @@
 """Render the README's animated detector demo.
 
 Replays a stretch of a tutorial video with the same overlay that
-`video2sheet.py --show` draws, and highlights each half of the staff at the
+`video2sheet --debug-gif` draws, and highlights each half of the staff at the
 moment it is captured, which is the part of the algorithm a still cannot show.
 
 Needs a local tutorial video; the repository ships none.
@@ -10,18 +10,14 @@ Needs a local tutorial video; the repository ships none.
 """
 
 import argparse
-import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import video2sheet as v  # noqa: E402
+from sheet_music_extractor import video2sheet as v
 
-BLACK = (0, 0, 0)
-RED = (0, 0, 255)
 RIGHT_TINT = (90, 170, 60)  # BGR
 LEFT_TINT = (170, 110, 60)
 FLASH_FRAMES = 4
@@ -91,11 +87,7 @@ def render(video, start, end, step, width, crop_pad, frame_ms, hold_ms):
                 label(view, f"left half captured  ->  staff line {captured}", (200, 130, 60))
             flash = (side, left - 1)
 
-        cv2.line(view, (th1, 0), (th1, boundary), BLACK, 3)
-        cv2.line(view, (th2, 0), (th2, boundary), BLACK, 3)
-        cv2.line(view, (0, boundary), (frame_width, boundary), RED, 4)
-        if x is not None:
-            cv2.line(view, (x, 0), (x, boundary), RED, 4)
+        v.draw_overlay(view, boundary, x, th1, th2, thickness=3)
 
         height = round(view.shape[0] * width / view.shape[1])
         view = cv2.resize(view, (width, height), interpolation=cv2.INTER_AREA)

@@ -1,9 +1,9 @@
-"""Fetch tutorial videos to feed into video2sheet.py.
+"""Fetch tutorial videos to feed into video2sheet.
 
 Takes either a single video URL or a channel, in which case its uploads can be
 filtered by title regex or sampled at random before downloading.
 
-By default only the video stream is downloaded: video2sheet.py reads frames and
+By default only the video stream is downloaded: video2sheet reads frames and
 never touches the audio, so pulling the audio track just wastes bandwidth.
 """
 

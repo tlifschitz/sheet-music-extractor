@@ -222,7 +222,7 @@ def main():
     Main function to process sheet music image
     """
     # Staff image to analyse. Generate one with:
-    #   python video2sheet.py <video> --dump-bars bars/
+    #   video2sheet <video> --dump-bars bars/
     input_path = sys.argv[1] if len(sys.argv) > 1 else "1.png"
 
     try:

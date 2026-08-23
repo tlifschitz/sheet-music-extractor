@@ -1,11 +1,23 @@
 # Lower bounds rather than exact pins: this is a small script with a stable
 # API surface, and it is verified to run on both the 4.x/py3.13 and the
 # 5.x/py3.14 stacks. Exact pins age into an uninstallable project.
+#
+# This file is the single source of truth for the runtime dependencies —
+# pyproject.toml reads it via [tool.setuptools.dynamic]. Keep every comment on
+# its own line: setuptools strips whole-line comments only, and a trailing
+# "# ..." on a requirement is not valid PEP 508 and breaks the build.
 
-opencv-python>=4.11
+# The headless build: no libGL, so it installs on a bare Linux box and in CI
+# without any apt step. It has no cv2.imshow, which is why the detector
+# overlay is written to a file via --debug-gif instead of a live window.
+opencv-python-headless>=4.11
+
 numpy>=2.2
 pillow>=11
-matplotlib>=3.10          # --plot, experiments/, and the bundled DejaVu title font
+
+# Not optional and not only for --plot: the title block is typeset with the
+# DejaVu font that ships inside the installed matplotlib package.
+matplotlib>=3.10
 
 # YouTube changes its extraction surface often; a stale yt-dlp stops working.
 yt-dlp>=2026.8.19

@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 import pytest
 
-import video2sheet as v
+from sheet_music_extractor import video2sheet as v
 
 
 def paper_frame(height=400, width=600, split=200, paper=250, dark=20):

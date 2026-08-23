@@ -2,7 +2,7 @@
 
 import pytest
 
-import youtube as yt
+from sheet_music_extractor import youtube as yt
 
 
 class TestChannelUrl:

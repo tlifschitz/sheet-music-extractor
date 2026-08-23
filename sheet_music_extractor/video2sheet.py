@@ -13,6 +13,7 @@ the right. Stitching the two halves gives a clean, cursor-free staff image.
 import argparse
 import re
 import subprocess
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -23,7 +24,7 @@ from PIL import Image, ImageDraw, ImageFont
 # --- Tuning constants -------------------------------------------------------
 # These are fitted to one channel's video layout. When extraction fails on a
 # new video it is almost always these, not the algorithm, that need adjusting;
-# run with --show to see what the detector is doing.
+# run with --debug-gif to see what the detector is doing.
 
 PLAYHEAD_ARM_RATIO = 0.25  # capture the right half once the playhead passes here
 PLAYHEAD_FIRE_RATIO = 0.85  # capture the left half and emit once it passes here
@@ -33,6 +34,16 @@ BAR_POSITION_SATURATION_THRESHOLD = 10
 PENTAGRAM_DETECTION_BAR_WIDTH = 20
 MIN_CORNER_BRIGHTNESS = 230
 BOUNDARY_JITTER_TOLERANCE = 10
+
+# --- Debug overlay ----------------------------------------------------------
+OVERLAY_BLACK = (0, 0, 0)  # BGR: the two capture thresholds
+OVERLAY_RED = (0, 0, 255)  # the playhead and the staff boundary
+# The reel is a throwaway diagnostic, so it is sampled and shrunk hard: a
+# full-rate reel of a 1080p video runs to hundreds of megabytes.
+DEBUG_GIF_MAX_FRAMES = 60
+DEBUG_GIF_WIDTH = 640
+DEBUG_GIF_FRAME_MS = 120
+DEBUG_GIF_COLORS = 64
 
 # --- Page layout ------------------------------------------------------------
 A4_WIDTH_PX = 2480  # A4 at 300 DPI
@@ -104,8 +115,48 @@ def detect_pentagram_boundary(frame):
     return average_corner_brightness, brightness_drop_y
 
 
-def extract_bars(video_path, show=False, dump_dir=None):
-    """Decode the video and return one greyscale image per staff line."""
+def draw_overlay(frame, boundary_y, playhead_x, th1, th2, thickness=2):
+    """Draw what the detector currently believes onto a frame.
+
+    Black: the two capture thresholds. Red: the staff boundary, and the
+    tracked playhead. With no boundary the frame is returned untouched, which
+    is itself the useful signal — it marks the frames where detection is lost.
+    """
+    if boundary_y is None:
+        return frame
+
+    cv2.line(frame, (th1, 0), (th1, boundary_y), OVERLAY_BLACK, thickness)
+    cv2.line(frame, (th2, 0), (th2, boundary_y), OVERLAY_BLACK, thickness)
+    cv2.line(frame, (0, boundary_y), (frame.shape[1], boundary_y), OVERLAY_RED, thickness + 1)
+    if playhead_x is not None:
+        cv2.line(frame, (playhead_x, 0), (playhead_x, boundary_y), OVERLAY_RED, thickness + 1)
+    return frame
+
+
+def save_debug_gif(frames, output_path):
+    """Write the sampled overlay frames out as an animated GIF."""
+    if not frames:
+        raise SystemExit("No debug frames were captured; the video decoded to nothing.")
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    frames = [f.quantize(colors=DEBUG_GIF_COLORS, method=Image.MEDIANCUT) for f in frames]
+    frames[0].save(
+        output_path,
+        save_all=True,
+        append_images=frames[1:],
+        duration=DEBUG_GIF_FRAME_MS,
+        loop=0,
+        optimize=True,
+    )
+    print(f"Wrote {len(frames)} debug frames to {output_path}")
+
+
+def extract_bars(video_path, dump_dir=None, debug_frames=None):
+    """Decode the video and return one greyscale image per staff line.
+
+    Pass a list as `debug_frames` to collect overlay stills along the way; the
+    video is sampled down to roughly DEBUG_GIF_MAX_FRAMES of them.
+    """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise SystemExit(f"Could not open video: {video_path}")
@@ -113,6 +164,7 @@ def extract_bars(video_path, show=False, dump_dir=None):
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"Frames per second: {fps}")
     print(f"Resolution: {width} x {height}")
 
@@ -120,6 +172,7 @@ def extract_bars(video_path, show=False, dump_dir=None):
     th1 = int(round(width * PLAYHEAD_ARM_RATIO))
     th2 = int(round(width * PLAYHEAD_FIRE_RATIO))
     mid = int(round(width * 0.5))
+    debug_step = max(1, total_frames // DEBUG_GIF_MAX_FRAMES)
 
     bars = []
     trace = {"x": [], "y": []}  # playhead position over time, for --plot
@@ -129,6 +182,15 @@ def extract_bars(video_path, show=False, dump_dir=None):
     bar_position = None
     cut_right = None
     frame_idx = 0
+
+    def record(frame, boundary_y, playhead_x):
+        """Sample this frame into the debug reel, if one is being collected."""
+        if debug_frames is None or frame_idx % debug_step:
+            return
+        view = draw_overlay(frame.copy(), boundary_y, playhead_x, th1, th2)
+        height = round(view.shape[0] * DEBUG_GIF_WIDTH / view.shape[1])
+        view = cv2.resize(view, (DEBUG_GIF_WIDTH, height), interpolation=cv2.INTER_AREA)
+        debug_frames.append(Image.fromarray(cv2.cvtColor(view, cv2.COLOR_BGR2RGB)))
 
     while True:
         ret, frame = cap.read()
@@ -160,10 +222,17 @@ def extract_bars(video_path, show=False, dump_dir=None):
                 )
                 boundary_y = None
                 state = 0
+                record(frame, None, None)
                 continue
             if abs(current_boundary_y - boundary_y) > BOUNDARY_JITTER_TOLERANCE:
                 print(f"Boundary moved from {boundary_y} to {current_boundary_y}, re-anchoring")
                 boundary_y = current_boundary_y
+                # Any half already grabbed was cropped to the old boundary, so
+                # it no longer matches the half still to come — hstack would
+                # raise on the mismatched heights. Drop it and wait for the
+                # playhead to wrap before starting a fresh sweep.
+                cut_right = None
+                state = 3
 
             staff = frame[:boundary_y, :]
             bar_position = get_bar_position(staff, kernel_size)
@@ -188,21 +257,9 @@ def extract_bars(video_path, show=False, dump_dir=None):
                 if state == 3 and bar_position < th1:
                     state = 1
 
-        if show:
-            if boundary_y is not None:
-                cv2.line(frame, (th1, 0), (th1, boundary_y), (0, 0, 0), 1)
-                cv2.line(frame, (th2, 0), (th2, boundary_y), (0, 0, 0), 1)
-                cv2.line(frame, (0, boundary_y), (width, boundary_y), (0, 0, 255), 2)
-                if bar_position is not None:
-                    cv2.line(frame, (bar_position, 0), (bar_position, boundary_y), (0, 0, 255), 2)
-            cv2.imshow("video2sheet", frame)
-            if cv2.waitKey(1) == ord("q"):
-                break
+        record(frame, boundary_y, bar_position)
 
     cap.release()
-    if show:
-        cv2.destroyAllWindows()
-
     return bars, trace
 
 
@@ -447,6 +504,20 @@ def plot_trace(trace, video_path):
     plt.show()
 
 
+def reveal(path):
+    """Best-effort "show the finished PDF"; never fatal.
+
+    The platform opener is absent on a headless box and on minimal images, and
+    failing there would crash after the work is already done — the path has
+    been printed either way.
+    """
+    opener = {"darwin": "open", "win32": "explorer"}.get(sys.platform, "xdg-open")
+    try:
+        subprocess.Popen([opener, str(path)])
+    except OSError:
+        pass
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("video", type=Path, help="path to the tutorial video")
@@ -454,10 +525,15 @@ def main():
         "-o",
         "--output-dir",
         type=Path,
-        default=Path(__file__).resolve().parent / "sheets",
-        help="where to write the PDF (default: ./sheets next to this script)",
+        default=Path("sheets"),
+        help="where to write the PDF (default: ./sheets, relative to where you run)",
     )
-    parser.add_argument("--show", action="store_true", help="live detector overlay; q to abort")
+    parser.add_argument(
+        "--debug-gif",
+        type=Path,
+        metavar="PATH",
+        help="write an animated overlay of what the detector saw, to diagnose a video",
+    )
     parser.add_argument("--plot", action="store_true", help="plot playhead position afterwards")
     parser.add_argument("--no-open", action="store_true", help="do not open the PDF when done")
     parser.add_argument(
@@ -481,13 +557,17 @@ def main():
     if args.dump_bars is not None:
         args.dump_bars.mkdir(parents=True, exist_ok=True)
 
-    bars, trace = extract_bars(args.video, show=args.show, dump_dir=args.dump_bars)
+    debug_frames = [] if args.debug_gif else None
+    bars, trace = extract_bars(args.video, dump_dir=args.dump_bars, debug_frames=debug_frames)
+
+    if args.debug_gif:
+        save_debug_gif(debug_frames, args.debug_gif)
 
     if not bars:
         raise SystemExit(
             "No staff lines were captured. The detector never completed a playhead "
             "sweep, which usually means the tuning constants at the top of this file "
-            "do not match this video's layout. Re-run with --show to diagnose."
+            "do not match this video's layout. Re-run with --debug-gif to diagnose."
         )
 
     parsed_title, parsed_artist = split_title(args.video.stem)
@@ -502,7 +582,7 @@ def main():
     if args.plot:
         plot_trace(trace, args.video)
     if not args.no_open:
-        subprocess.Popen(["open", str(output_path)])
+        reveal(output_path)
 
 
 if __name__ == "__main__":

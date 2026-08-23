@@ -116,11 +116,20 @@ venv/bin/python -m pip install -e ".[dev]"
 venv/bin/pytest -q
 ```
 
-The detector is covered by synthetic frames built with numpy — a white block
-over a dark one for the staff boundary, a single saturated column for the
-playhead — so the suite needs no video fixtures and runs in under a second.
-The page-layout arithmetic and the URL handling in the fetcher are covered the
-same way.
+The detector, the page-layout arithmetic and the fetcher's URL handling are
+covered by synthetic frames built with numpy — a white block over a dark one
+for the staff boundary, a single saturated column for the playhead.
+
+On top of that, an end-to-end test synthesises a short tutorial video with
+`cv2.VideoWriter` — bright paper, a dark note band, a saturated cursor
+sweeping across — and runs the real pipeline over it. Its load-bearing
+assertion is that no captured staff line contains a saturated column: if the
+playhead ends up inside one, the split-capture timing failed. A second video
+starts with the playhead already past both thresholds, pinning the state
+machine against a bug that once stitched two halves grabbed at the same
+instant.
+
+Nothing is checked in and the whole suite runs in about three seconds.
 
 ## Limitations
 

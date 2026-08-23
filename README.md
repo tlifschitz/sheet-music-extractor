@@ -2,9 +2,14 @@
 
 [![tests](https://github.com/tlifschitz/sheet-music-extractor/actions/workflows/ci.yml/badge.svg)](https://github.com/tlifschitz/sheet-music-extractor/actions/workflows/ci.yml)
 
-Reconstructs a printable PDF score from a piano-tutorial video — the kind that
-scrolls a staff across the top of the frame while notes fall onto a keyboard
-below.
+You play piano, you read sheet music, and one day you found an arrangement you
+loved — in a YouTube tutorial. You tried to read the staff scrolling across the
+top of the frame, pausing and rewinding, pausing and rewinding, and about two
+bars in you thought: I just want this printed. But the creator never posted the
+PDF.
+
+That is what this is for. It watches the video and reconstructs the score as a
+printable PDF.
 
 ![Left: a frame of the source video. Right: page one of the score it produces.](docs/before-after.png)
 

@@ -18,9 +18,10 @@ from sheet_music_extractor import video2sheet as v
 from conftest import (
     CURSOR_BGR,
     DETECTED_BOUNDARY,
+    HEIGHT,
     WIDTH,
     peak_column_saturation,
-    write_tutorial_video,
+    write_frames,
 )
 
 
@@ -134,13 +135,8 @@ class TestCommandLine:
     def test_a_video_with_no_staff_exits_with_guidance(self, tmp_path, monkeypatch):
         """A title card only: bright paper is never found, so nothing is
         captured and the user is pointed at the tuning constants."""
-        path = write_tutorial_video(tmp_path / "blank.avi", sweeps=0, lead_in=())
-        writer = cv2.VideoWriter(
-            str(path), cv2.VideoWriter_fourcc(*"MJPG"), 25.0, (WIDTH, 176)
-        )
-        for _ in range(10):
-            writer.write(np.zeros((176, WIDTH, 3), np.uint8))
-        writer.release()
+        black = np.zeros((HEIGHT, WIDTH, 3), np.uint8)
+        path = write_frames(tmp_path / "blank.avi", [black] * 10)
 
         monkeypatch.setattr(sys, "argv", ["video2sheet", str(path), "--no-open"])
         with pytest.raises(SystemExit, match="--debug-gif"):

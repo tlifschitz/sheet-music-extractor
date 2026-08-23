@@ -4,17 +4,17 @@ Reproduces the layout `extract_bars` expects — bright paper on top, a dark
 falling-note band below, a saturated cursor sweeping across the staff — so the
 suite exercises the real pipeline without shipping any video.
 
-The geometry is chosen so MJPG compression cannot disturb the detector:
+Two things keep it deterministic:
 
-* 320x176, both multiples of 8, so there is no macroblock padding.
-* The paper/notes boundary sits on row 112 (14 * 8), a block edge, with
-  uniform blocks on either side. `detect_pentagram_boundary` then reports 111
-  on every frame, and every captured staff line has an identical shape.
-* Nothing — no mark, no cursor — ever enters columns 0..19, the strip the
-  boundary detector reads. A cursor there would drag the mean brightness under
+* **A lossless codec, verified rather than assumed.** See `write_frames` —
+  this matters far more than it sounds, and a lossy one silently inverts the
+  central assertion.
+* **Geometry that leaves no room for interpretation.** 320x176 with the
+  paper/notes boundary on row 112, so `detect_pentagram_boundary` reports 111
+  on every frame and every captured staff line comes out the same shape.
+  Nothing — no mark, no cursor — ever enters columns 0..19, the strip that
+  detector reads; a cursor there would drag the mean brightness under
   MIN_CORNER_BRIGHTNESS and reset the state machine every lap.
-* Marks are horizontal, so JPEG error lands in vertical frequencies and
-  produces no chroma fringing that could read as a stray playhead.
 """
 
 import cv2
@@ -29,6 +29,9 @@ CURSOR_WIDTH = 8
 CURSOR_BGR = (0, 0, 255)  # pure red: saturation 255
 MARK_ROWS = (30, 50, 70, 90)  # fake staff lines
 MARK_LEFT, MARK_RIGHT = 24, 312
+
+# Tried in order; the first that opens and round-trips exactly is used.
+LOSSLESS_CODECS = ("FFV1", "png ", "HFYU")
 
 # Never below 24: that keeps the cursor clear of the 20-column detection strip.
 SWEEP_POSITIONS = tuple(range(24, WIDTH, 12))
@@ -45,25 +48,50 @@ def _frame(cursor_x):
     return frame
 
 
+def _round_trips_exactly(path, expected):
+    """Did the encoder give the first frame back untouched?"""
+    cap = cv2.VideoCapture(str(path))
+    ok, frame = cap.read()
+    cap.release()
+    return ok and np.array_equal(frame, expected)
+
+
+def write_frames(path, frames):
+    """Write frames losslessly, and prove it before handing the file back.
+
+    A lossy codec is not merely imprecise here, it inverts the result: MJPG
+    leaves chroma ringing that reads as a faint playhead, and OpenCV's
+    "uncompressed" AVI round-trips white as 254 with a peak column saturation
+    of 11 — over the detector's own threshold of 10. Both would fail the
+    cursor-free assertion on a pipeline that is working perfectly.
+
+    So each candidate is tried in turn and the round trip is verified rather
+    than assumed. Any build that cannot manage one is skipped, loudly.
+    """
+    for fourcc in LOSSLESS_CODECS:
+        writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*fourcc), FPS, (WIDTH, HEIGHT))
+        if not writer.isOpened():
+            writer.release()
+            continue
+        for frame in frames:
+            writer.write(frame)
+        writer.release()
+        if frames and _round_trips_exactly(path, frames[0]):
+            return path
+
+    pytest.skip(f"no lossless video codec in this OpenCV build (tried {LOSSLESS_CODECS})")
+
+
 def write_tutorial_video(path, sweeps, lead_in=()):
     """Write `sweeps` full playhead sweeps to `path`, returning it.
 
     `lead_in` is a sequence of cursor positions played before the first full
     sweep — used to drop the detector into the middle of a sweep.
     """
-    writer = cv2.VideoWriter(
-        str(path), cv2.VideoWriter_fourcc(*"MJPG"), FPS, (WIDTH, HEIGHT)
-    )
-    if not writer.isOpened():
-        pytest.skip("this OpenCV build cannot write MJPG/AVI")
-
-    for cursor_x in lead_in:
-        writer.write(_frame(cursor_x))
+    frames = [_frame(cursor_x) for cursor_x in lead_in]
     for _ in range(sweeps):
-        for cursor_x in SWEEP_POSITIONS:
-            writer.write(_frame(cursor_x))
-    writer.release()
-    return path
+        frames.extend(_frame(cursor_x) for cursor_x in SWEEP_POSITIONS)
+    return write_frames(path, frames)
 
 
 def peak_column_saturation(bgr):

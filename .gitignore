@@ -12,6 +12,7 @@ sheets/
 *.png
 !docs/*.png
 !packaging/icon.png
+!site/*.png
 sheet_frames/
 
 # Python

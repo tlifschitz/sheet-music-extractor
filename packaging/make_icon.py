@@ -18,6 +18,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 HERE = Path(__file__).parent
+SITE = HERE.parent / "site"
 
 # Everything is drawn in this square, then rounded off and inset into the
 # 1024px canvas macOS and Windows both want.
@@ -113,6 +114,19 @@ def main():
         sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)],
     )
     print("wrote icon.png, icon.icns, icon.ico in", HERE)
+
+    # The site wears the same face as the app. Emitted from here rather than
+    # kept as separate art, so there is one drawing and the tab icon cannot
+    # drift from the thing the visitor downloads.
+    icon.save(SITE / "favicon.ico", sizes=[(s, s) for s in (16, 32, 48)])
+
+    # iOS composites a home-screen icon over black and applies its own mask,
+    # so the transparent rounded corners have to go: flatten onto the paper
+    # colour and let the system round it.
+    touch = Image.new("RGB", icon.size, PAPER)
+    touch.paste(icon, mask=icon.getchannel("A"))
+    touch.resize((180, 180), Image.LANCZOS).save(SITE / "apple-touch-icon.png")
+    print("wrote favicon.ico, apple-touch-icon.png in", SITE)
 
 
 if __name__ == "__main__":

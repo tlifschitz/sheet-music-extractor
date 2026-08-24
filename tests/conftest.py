@@ -110,7 +110,7 @@ def _extract(video, tmp_path_factory, name):
     cannot be checked on them. `--dump-bars` writes the colour originals, and
     those are what the assertions read.
     """
-    from sheet_music_extractor import video2sheet as v
+    from video2sheet import pipeline as v
 
     dump_dir = tmp_path_factory.mktemp(name)
     bars, _ = v.extract_bars(video, dump_dir=dump_dir)

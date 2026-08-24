@@ -33,7 +33,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
 
-from sheet_music_extractor import video2sheet as v
+from video2sheet import pipeline as v
 
 # Echoes the debug overlay, so the figures and the GIF can be read as one
 # legend: red is what the detector believes, black is a threshold it tests

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import cv2
 
-from . import video2sheet as v
+from . import pipeline as v
 
 WINDOW_TITLE = "Video to Sheet Music"
 # Formats OpenCV will actually decode. Anything else is offered under "all

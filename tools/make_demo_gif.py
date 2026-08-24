@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from sheet_music_extractor import video2sheet as v
+from video2sheet import pipeline as v
 
 RIGHT_TINT = (90, 170, 60)  # BGR
 LEFT_TINT = (170, 110, 60)

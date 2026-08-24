@@ -9,7 +9,7 @@ display, and CI does not have one.
 import numpy as np
 import pytest
 
-from sheet_music_extractor import gui
+from video2sheet import gui
 
 from conftest import HEIGHT, WIDTH, write_frames
 

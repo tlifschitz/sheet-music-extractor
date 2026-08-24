@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from sheet_music_extractor import video2sheet as v
+from video2sheet import pipeline as v
 
 
 class TestSplitTitle:

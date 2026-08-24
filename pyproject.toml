@@ -5,7 +5,7 @@ requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sheet-music-extractor"
+name = "video2sheet"
 version = "0.1.0"
 description = "Reconstruct printable PDF scores from piano-tutorial videos"
 readme = "README.md"
@@ -37,24 +37,24 @@ dev = ["pytest>=8.0"]
 package = ["pyinstaller>=6.10"]
 
 [project.scripts]
-video2sheet = "sheet_music_extractor.video2sheet:main"
-video2sheet-fetch = "sheet_music_extractor.youtube:main"
+video2sheet = "video2sheet.pipeline:main"
+video2sheet-fetch = "video2sheet.youtube:main"
 
 [project.gui-scripts]
 # gui-scripts, not scripts: on Windows this builds a launcher with no console
 # window attached, which is the whole point for a double-clicked app.
-video2sheet-app = "sheet_music_extractor.gui:main"
+video2sheet-app = "video2sheet.gui:main"
 
 [project.urls]
-Homepage = "https://github.com/tlifschitz/sheet-music-extractor"
-Source = "https://github.com/tlifschitz/sheet-music-extractor"
-Issues = "https://github.com/tlifschitz/sheet-music-extractor/issues"
+Homepage = "https://github.com/tlifschitz/video2sheet"
+Source = "https://github.com/tlifschitz/video2sheet"
+Issues = "https://github.com/tlifschitz/video2sheet/issues"
 
 [tool.setuptools]
 # Explicit, not discovered. Flat-layout auto-discovery would see tests/,
 # tools/, experiments/, docs/, videos/, sheets/ and venv/ and hard-error with
 # "Multiple top-level packages discovered in a flat-layout".
-packages = ["sheet_music_extractor"]
+packages = ["video2sheet"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

@@ -1,6 +1,6 @@
-# sheet-music-extractor
+# video2sheet
 
-[![tests](https://github.com/tlifschitz/sheet-music-extractor/actions/workflows/ci.yml/badge.svg)](https://github.com/tlifschitz/sheet-music-extractor/actions/workflows/ci.yml)
+[![tests](https://github.com/tlifschitz/video2sheet/actions/workflows/ci.yml/badge.svg)](https://github.com/tlifschitz/video2sheet/actions/workflows/ci.yml)
 
 You play piano, you read sheet music, and one day you found an arrangement you
 loved — in a YouTube tutorial. You tried to read the staff scrolling across the
@@ -18,7 +18,7 @@ One video in, a printable PDF out.
 ## Just want the PDF?
 
 **[video2sheet.tlifschitz.com](https://video2sheet.tlifschitz.com)** — or
-[download the app](https://github.com/tlifschitz/sheet-music-extractor/releases/latest)
+[download the app](https://github.com/tlifschitz/video2sheet/releases/latest)
 straight from the releases page. There is nothing to install. Unzip it, open
 it, choose your video, and the PDF appears next to it.
 
@@ -118,7 +118,7 @@ For the command line. (For the app, see
 [Just want the PDF?](#just-want-the-pdf) above.)
 
 ```bash
-pipx install git+https://github.com/tlifschitz/sheet-music-extractor
+pipx install git+https://github.com/tlifschitz/video2sheet
 ```
 
 Or from a clone, for hacking on it:
@@ -201,7 +201,7 @@ Nothing is checked in and the whole suite runs in about three seconds.
 The detector is fitted to one channel's video layout — staff on top, notes
 below, a saturated playhead, a light background. Videos shaped differently will
 either find no staff boundary or capture nothing, and the constants at the top
-of `sheet_music_extractor/video2sheet.py` are where you would adapt it.
+of `video2sheet/pipeline.py` are where you would adapt it.
 
 It also reads only what is drawn on screen: no OMR, no MusicXML, no MIDI. The
 output is an image-based PDF, so it is printable but not editable in notation

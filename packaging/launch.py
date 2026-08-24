@@ -18,7 +18,7 @@ def self_test(video=None):
     """
     from PIL import ImageFont
 
-    from sheet_music_extractor import video2sheet as v
+    from video2sheet import pipeline as v
 
     font = v._font(112, bold=True)
     if not isinstance(font, ImageFont.FreeTypeFont):
@@ -26,7 +26,7 @@ def self_test(video=None):
     print(f"self-test: font ok ({font.getname()})")
 
     if video:
-        from sheet_music_extractor.gui import convert
+        from video2sheet.gui import convert
 
         output, count = convert(video)
         print(f"self-test: {count} staff lines -> {output}")
@@ -38,7 +38,7 @@ def main():
         if "--self-test" in sys.argv:
             rest = [a for a in sys.argv[1:] if a != "--self-test"]
             return self_test(rest[0] if rest else None)
-        from sheet_music_extractor.gui import main as run
+        from video2sheet.gui import main as run
         run()
     except Exception:
         details = traceback.format_exc()

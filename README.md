@@ -17,9 +17,10 @@ One video in, a printable PDF out.
 
 ## Just want the PDF?
 
-**[Download the app](https://github.com/tlifschitz/sheet-music-extractor/releases/latest)**
-— there is nothing to install. Unzip it, open it, choose your video, and the
-PDF appears next to it.
+**[video2sheet.tlifschitz.com](https://video2sheet.tlifschitz.com)** — or
+[download the app](https://github.com/tlifschitz/sheet-music-extractor/releases/latest)
+straight from the releases page. There is nothing to install. Unzip it, open
+it, choose your video, and the PDF appears next to it.
 
 The first time you open it, your computer will warn you that it does not
 recognise the app. It is unsigned, which is the same thing every small

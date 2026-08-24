@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works — Video to Sheet Music</title>
+<meta name="description" content="How a piano tutorial video is turned into a printable score: finding the staff, tracking the playhead, and capturing each half at the right moment.">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#127932;</text></svg>">
+</head>
+<body>
+
+<header>
+  <p class="small"><a href="index.html">← Video to Sheet Music</a></p>
+  <h1>How it works</h1>
+  <p class="lede">
+    The hard part is not reading the staff — it is already a clean,
+    high-contrast render. The hard part is that a coloured playhead sits on top
+    of the music, and any single frame you grab has the cursor smeared across
+    it.
+  </p>
+  <p>The pipeline solves this with timing rather than repair.</p>
+</header>
+
+<main>
+
+<h2>1. Find the staff</h2>
+
+<p>
+  A narrow strip at the left edge of the frame is checked for brightness.
+  Bright means we are on white paper rather than a title card; the sharpest
+  vertical brightness change inside that strip is the bottom edge of the sheet
+  music. Everything below it — falling notes, keyboard, lyrics — is discarded.
+</p>
+
+<figure class="wide detail">
+  <div class="scroll">
+    <img src="images/step-1-find-the-staff.png" width="1187" height="749" loading="lazy"
+         alt="Three frames across the video's fade-in with the inspected strip and corner marked, above a plot of corner brightness over time and the brightness profile down the strip.">
+  </div>
+  <figcaption>
+    This video opens on a title card and fades the paper in, so you can watch
+    the check flip: the corner reads 225 at frame 288 and 232 at frame 289, and
+    the frame that crosses the threshold is the frame the detector wakes up on.
+  </figcaption>
+</figure>
+
+<h2>2. Track the playhead</h2>
+
+<p>
+  The staff is greyscale, so the cursor is the only strongly saturated thing in
+  the crop. Converting to HSV and taking the column with peak mean saturation
+  locates it in one pass, with no template matching and no colour to tune per
+  video.
+</p>
+
+<figure class="wide detail">
+  <div class="scroll">
+    <img src="images/step-2-track-the-playhead.png" width="993" height="1043" loading="lazy"
+         alt="A frame, its saturation channel whole and cropped, and the mean saturation of each column with the cursor standing out as a single peak.">
+  </div>
+  <figcaption>
+    The falling-note area saturates all the way to 255 — which is why the crop
+    comes first — while above the boundary the median is 0 and the cursor
+    stands alone.
+  </figcaption>
+</figure>
+
+<h2>3. Capture each half at the right moment</h2>
+
+<p>
+  As the playhead sweeps left to right, the <b>right</b> half of the staff is
+  saved once the cursor passes 25% of the frame width, and the <b>left</b> half
+  once it passes 85%. Neither capture has the cursor in it. Stitching the two
+  halves reconstructs one complete, cursor-free staff line.
+  <b>This is the whole trick.</b>
+</p>
+
+<figure class="wide detail">
+  <div class="scroll">
+    <img src="images/step-3-split-capture.png" width="1200" height="890" loading="lazy"
+         alt="The playhead's position through one sweep with the two thresholds marked, the two frames at the moments of capture with the captured half highlighted, and the stitched result.">
+  </div>
+  <figcaption>
+    The right half is grabbed at frame 446 with the cursor at x=487, the left
+    at frame 1020 with it at 1677, and the stitch of the two is a staff line
+    the cursor was never in.
+  </figcaption>
+</figure>
+
+<h2>4. Lay out pages</h2>
+
+<p>
+  Staff lines are scaled to A4 width at 300 DPI and stacked until the next one
+  would overflow the page, then a new page starts. The lines are spread evenly
+  rather than crammed, so a page never ends with a gap that looks like a line
+  failed to fit.
+</p>
+
+<figure class="wide detail">
+  <div class="scroll">
+    <img src="images/step-4-lay-out-pages.png" width="1156" height="779" loading="lazy"
+         alt="Three pages of the finished score under each layout mode with the margins marked, beside a chart of how many staff lines land on each page.">
+  </div>
+  <figcaption>
+    Fifteen staff lines over three pages, and the difference balancing makes:
+    5/5/5 rather than 6/6/3, for the same three sheets of paper.
+  </figcaption>
+</figure>
+
+<h2>Where it breaks</h2>
+
+<p>
+  The technique rests on one assumption: the staff does not move during a
+  sweep. When that holds, the seam between the two halves is exact — they come
+  from the same rendering of the same music. When it does not, the halves come
+  from different music and the stitch is visibly wrong. Videos that scroll
+  continuously rather than a screenful at a time need an entirely different
+  approach.
+</p>
+
+<p>
+  For the reasoning behind the design — why inpainting and frame compositing
+  both fail here, why the two thresholds are asymmetric, and what the whole
+  thing costs — see
+  <a href="https://github.com/tlifschitz/sheet-music-extractor/blob/master/docs/why-split-capture.md"><b>Why split capture</b></a>.
+</p>
+
+</main>
+
+<footer>
+  <p>
+    <a href="index.html">Download</a> ·
+    <a href="https://github.com/tlifschitz/sheet-music-extractor">Source on GitHub</a>
+  </p>
+  <p class="small">
+    Every figure on this page is generated from a real run of the pipeline, so
+    the numbers in them are measured rather than drawn.
+  </p>
+</footer>
+
+</body>
+</html>

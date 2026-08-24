@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video to Sheet Music</title>
+<meta name="description" content="Turn a piano tutorial video into a printable PDF score. Free, runs on your own computer, nothing to install.">
+<meta property="og:title" content="Video to Sheet Music">
+<meta property="og:description" content="Turn a piano tutorial video into a printable PDF score.">
+<meta property="og:image" content="images/before-after.png">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#127932;</text></svg>">
+</head>
+<body>
+
+<header>
+  <h1>Video to Sheet Music</h1>
+  <p class="lede">
+    You play piano, you read sheet music, and one day you found an arrangement
+    you loved — in a YouTube tutorial. You tried to read the staff scrolling
+    across the top of the frame, pausing and rewinding, pausing and rewinding,
+    and about two bars in you thought: I just want this printed. But the
+    creator never posted the PDF.
+  </p>
+  <p>That is what this is for. It watches the video and reconstructs the score as a printable PDF.</p>
+</header>
+
+<main>
+
+<figure class="wide">
+  <div class="scroll">
+    <img src="images/before-after.png" width="1048" height="470"
+         alt="Left: a frame of the source video, showing a staff at the top and falling notes below. Right: page one of the printed score it produces.">
+  </div>
+  <figcaption>One video in, a printable PDF out.</figcaption>
+</figure>
+
+<h2>Download it</h2>
+
+<p>
+  There is nothing to install and nothing to sign up for. It runs on your own
+  computer — your video is never uploaded anywhere.
+</p>
+
+<div class="downloads">
+  <a class="btn" id="mac"
+     href="https://github.com/tlifschitz/sheet-music-extractor/releases/latest/download/Video-to-Sheet-Music-macOS.zip">
+    <b>Download for Mac</b>
+    <span>macOS · 64&nbsp;MB</span>
+  </a>
+  <a class="btn" id="win"
+     href="https://github.com/tlifschitz/sheet-music-extractor/releases/latest/download/Video-to-Sheet-Music-Windows.zip">
+    <b>Download for Windows</b>
+    <span>Windows · 74&nbsp;MB</span>
+  </a>
+</div>
+
+<p class="small soft">
+  Unzip it, open it, choose your video. The PDF is saved next to the video and
+  opens when it is done.
+</p>
+
+<div class="note">
+  <p><b>The first time you open it, your computer will warn you.</b></p>
+  <p>
+    This is a free tool that is not signed with a paid developer certificate,
+    so your computer has not seen it before and says so. Nothing is wrong. You
+    need this once:
+  </p>
+  <ul>
+    <li><b>Mac</b> — right-click the app, choose <b>Open</b>, then <b>Open</b> again to confirm. Double-clicking will not work the first time.</li>
+    <li><b>Windows</b> — on the blue “Windows protected your PC” box, click <b>More info</b>, then <b>Run anyway</b>.</li>
+  </ul>
+</div>
+
+<h2>Which videos work</h2>
+
+<p>
+  This reads one particular kind of tutorial: <b>sheet music scrolling across
+  the top</b> of the frame, <b>falling notes below it</b>, and a
+  <b>coloured cursor</b> sweeping left to right across the staff, on a light
+  background. Like this:
+</p>
+
+<figure>
+  <div class="scroll">
+    <img src="images/detector.gif" width="760" height="158"
+         alt="An animated frame of a tutorial video: a staff at the top with a coloured playhead sweeping across it, highlighted as each half is captured.">
+  </div>
+  <figcaption>
+    The tool watching a video. It grabs the right half of the staff while the
+    cursor is still on the left, and the left half once the cursor has passed —
+    so the cursor is never in the picture.
+  </figcaption>
+</figure>
+
+<p>
+  Videos shaped differently — no printed staff, a dark background, or music
+  that scrolls smoothly instead of a screenful at a time — will not work, and
+  the app will tell you so rather than producing a bad score.
+</p>
+
+<h2>What you get</h2>
+
+<ul class="plain">
+  <li>An A4 PDF at print resolution, with a title and page numbers.</li>
+  <li>Staff lines spread evenly across the pages, the way an engraved score sets them.</li>
+  <li>No watermark, no account, no upload, no limit on how many you convert.</li>
+</ul>
+
+<p>
+  It is a picture of the music, not a transcription of it — so it prints and
+  reads beautifully, but it will not open in MuseScore or Sibelius as editable
+  notation, and there is no MIDI.
+</p>
+
+<h2>Is this legal?</h2>
+
+<p>
+  The tool is yours to use; what you point it at is your business. Most piano
+  tutorials, and the arrangements in them, belong to whoever made them. Use it
+  on material you have the right to use.
+</p>
+
+</main>
+
+<footer>
+  <p>
+    <a href="how-it-works.html">How it works</a> ·
+    <a href="https://github.com/tlifschitz/sheet-music-extractor">Source on GitHub</a> ·
+    <a href="https://github.com/tlifschitz/sheet-music-extractor/releases">All releases</a>
+  </p>
+  <p class="small">
+    Prefer a terminal? <code>pipx install git+https://github.com/tlifschitz/sheet-music-extractor</code>
+    gives you <code>video2sheet</code>. Free and open source, MIT licensed.
+  </p>
+</footer>
+
+<script>
+// Promote the button that matches the visitor's computer. Both links always
+// work and both stay visible: platform detection is wrong often enough that
+// hiding one would strand people on the wrong machine.
+(function () {
+  var ua = (navigator.userAgentData && navigator.userAgentData.platform)
+        || navigator.platform || navigator.userAgent || "";
+  var mac = /mac/i.test(ua);
+  var win = /win/i.test(ua);
+  if (mac === win) return;              // unknown, or somehow both: leave it alone
+  var el = document.getElementById(mac ? "mac" : "win");
+  if (el) el.classList.add("suggested");
+})();
+</script>
+
+</body>
+</html>

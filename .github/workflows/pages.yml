@@ -1,0 +1,67 @@
+name: site
+
+# Deploys video2sheet.tlifschitz.com — the front door for people who are never
+# going to find a GitHub release page.
+on:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - "docs/*.png"
+      - "docs/*.gif"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two pushes race a deploy. Not cancel-in-progress: a half-finished
+# deploy that gets cancelled can leave the live site on an older build.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # The figures are copied in from docs/ rather than duplicated into site/.
+      # docs/ is where make_figures.py writes them, so regenerating a figure
+      # updates the site too and the two cannot drift apart.
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/images
+          cp -r site/. _site/
+          cp docs/*.png docs/detector.gif _site/images/
+
+      # A missing image deploys as a broken picture and nobody notices for
+      # months. Cheaper to fail the build.
+      - name: Every referenced image exists
+        run: |
+          missing=0
+          for src in $(grep -ho 'src="images/[^"]*"' _site/*.html | cut -d'"' -f2 | sort -u); do
+            if [ -f "_site/$src" ]; then
+              echo "  ok      $src"
+            else
+              echo "  MISSING $src"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

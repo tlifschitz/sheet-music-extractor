@@ -1,0 +1,168 @@
+/* One stylesheet, no framework, no external requests. The page has to be fast
+   for someone on a phone who just wants a PDF. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Light is the base. Both themes redefine these same names, so no colour is
+     ever defined only inside a media query. */
+  --bg: #fbfbf9;
+  --panel: #ffffff;
+  --ink: #1b1b1a;
+  --ink-soft: #55554f;
+  --rule: #e2e1db;
+  --accent: #8a3a2c;
+  --accent-ink: #ffffff;
+  --warn-bg: #fdf6e6;
+  --warn-rule: #e6d3a3;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 8px 24px rgba(0, 0, 0, .06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171a;
+    --panel: #1e2024;
+    --ink: #e8e8e4;
+    --ink-soft: #a2a49e;
+    --rule: #313339;
+    --accent: #e08a72;
+    --accent-ink: #1b1b1a;
+    --warn-bg: #262218;
+    --warn-rule: #4d4227;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 1.25rem 5rem;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+main, header, footer { max-width: 34rem; margin: 0 auto; }
+
+/* Figures are allowed to break the measure, but they scroll inside their own
+   box rather than pushing the page sideways. */
+.wide { max-width: 60rem; }
+
+h1 {
+  font-size: clamp(1.9rem, 6vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  margin: 2.5rem 0 .5rem;
+}
+h2 {
+  font-size: 1.3rem;
+  letter-spacing: -.01em;
+  margin: 3rem 0 .75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+h2:first-of-type { border-top: 0; padding-top: 0; }
+h3 { font-size: 1.02rem; margin: 1.75rem 0 .4rem; }
+
+p { margin: 0 0 1rem; }
+.lede { font-size: 1.1rem; color: var(--ink-soft); }
+.soft { color: var(--ink-soft); }
+.small { font-size: .9rem; }
+
+a { color: var(--accent); text-underline-offset: .15em; }
+a:hover { text-decoration-thickness: 2px; }
+
+img { max-width: 100%; height: auto; display: block; }
+
+figure { margin: 1.5rem 0; }
+figure .scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px;
+                 background: var(--panel); }
+figure img { border-radius: 9px; }
+figcaption { margin-top: .6rem; font-size: .9rem; color: var(--ink-soft); }
+
+/* Dense figures — the plotted ones — stay legible by scrolling inside their
+   own box rather than shrinking to illegibility. min() rather than a media
+   query so it is self-limiting: on a narrow screen the floor collapses to the
+   container width and the page cannot be pushed sideways. A plain 34rem here
+   forced the whole layout wider than a phone. */
+figure.detail img { min-width: min(34rem, 100%); }
+
+/* --- Downloads ---------------------------------------------------------- */
+
+.downloads { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1.5rem 0 .75rem; }
+
+.btn {
+  display: block;
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: .85rem 1.1rem;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+.btn b { display: block; font-size: 1.02rem; }
+.btn span { font-size: .84rem; color: var(--ink-soft); }
+.btn:hover { border-color: var(--accent); }
+
+/* Set by a few lines of script once the platform is known. Everything works
+   without it — this only changes which button looks like the obvious one. */
+.btn.suggested {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.btn.suggested span { color: var(--accent-ink); opacity: .85; }
+
+.note {
+  margin: 1.5rem 0;
+  padding: 1rem 1.15rem;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-rule);
+  border-radius: 10px;
+  font-size: .95rem;
+}
+.note p:last-child, .note ul:last-child { margin-bottom: 0; }
+.note ul { margin: .5rem 0 0; padding-left: 1.1rem; }
+.note li { margin: .35rem 0; }
+
+code, kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .88em;
+  /* The install line is one unbreakable token wider than a phone. Without
+     this it is the only thing on the page that can push the body sideways. */
+  overflow-wrap: anywhere;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: .1em .35em;
+}
+pre {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: .9rem 1rem;
+  overflow-x: auto;
+}
+pre code { background: none; border: 0; padding: 0; }
+
+ul.plain { list-style: none; padding: 0; }
+ul.plain li { padding-left: 1.4rem; position: relative; margin: .5rem 0; }
+ul.plain li::before { content: "→"; position: absolute; left: 0; color: var(--accent); }
+
+footer {
+  margin-top: 4rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+  font-size: .92rem;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 40rem) {
+  figure .scroll { border: 0; background: none; }
+}

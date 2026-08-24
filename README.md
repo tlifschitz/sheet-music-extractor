@@ -36,10 +36,26 @@ The pipeline solves this with timing rather than inpainting:
    of the sheet music. Everything below it — falling notes, keyboard, lyrics —
    is discarded.
 
+   ![Three frames across the video's fade-in, with the strip and corner marked, above plots of corner brightness over time and the brightness profile down the strip](docs/step-1-find-the-staff.png)
+
+   *This video opens on a title card and fades the paper in, so you can watch
+   the check flip: the corner reads 225 at frame 288 and 232 at frame 289, and
+   the frame that crosses `MIN_CORNER_BRIGHTNESS` is the frame the detector
+   wakes up on. Right: down the strip the brightness is very nearly a step
+   function, and the sharpest change in it is the boundary.*
+
 2. **Track the playhead.** The staff is greyscale, so the cursor is the only
    strongly saturated thing in the crop. Converting to HSV and taking the
    column with peak mean saturation locates it in one pass, with no template
    matching or colour range to tune per video.
+
+   ![A frame, its HSV saturation channel whole and cropped, and the mean saturation of each column with the cursor as a single peak](docs/step-2-track-the-playhead.png)
+
+   *The same frame four ways. The falling-note area saturates all the way to
+   255 — which is why the crop comes first — while above the boundary the
+   median is 0.0 and the cursor stands alone. The smaller peaks are coloured
+   marks in the notation: the threshold only decides whether a cursor is on
+   screen at all, and the argmax is what places it.*
 
 3. **Capture each half at the right moment.** As the playhead sweeps left to
    right, the **right** half of the staff is saved once the cursor passes 25% of
@@ -47,8 +63,26 @@ The pipeline solves this with timing rather than inpainting:
    has the cursor in it. `hstack`-ing the two halves reconstructs one complete,
    cursor-free staff line. This is the whole trick.
 
+   ![The playhead's position through one sweep with the two thresholds marked, the two frames at the moments of capture with the captured half highlighted, and the stitched result](docs/step-3-split-capture.png)
+
+   *One sweep, and the two moments that matter. The right half is grabbed at
+   frame 446 with the cursor at x=487, the left at frame 1020 with it at 1677,
+   and the stitch of the two is a staff line the cursor was never in. Measured
+   on the result: those two columns carry a saturation of 0.03 and 0.0, against
+   43 and 31 in the frames they were cut from.*
+
 4. **Lay out pages.** Staff lines are scaled to A4 width at 300 DPI and stacked
    until the next one would overflow the page, then a new page starts.
+
+   ![Three pages of the finished score under each layout mode, with the margins marked, beside a chart of how many staff lines land on each page](docs/step-4-lay-out-pages.png)
+
+   *Fifteen staff lines over three pages, and the difference balancing makes:
+   5/5/5 rather than 6/6/3, for the same three sheets of paper.*
+
+The four figures above are drawn by [`docs/make_figures.py`](docs/make_figures.py)
+from a real run of the pipeline, with the annotations read out of the detector
+through the `observer` hook as it works. Retune a constant and the next run
+redraws them; they cannot quietly disagree with the code they document.
 
 Throughput is roughly 160 frames/second at 1080p and 1400 at 360p — the work
 scales with pixel count. A four-minute clip takes anywhere from 6 seconds to a
@@ -150,14 +184,6 @@ software.
 Bar-line detection (splitting staff lines on musical boundaries rather than
 screen boundaries) is prototyped in [`experiments/`](experiments/) but not
 finished.
-
-## Note on source material
-
-Piano tutorial videos and the scores derived from them are usually copyrighted.
-This repository ships no videos and no usable scores — only the code. The
-images above are low-resolution illustrations: the page shown is about a
-seventh of print size, far too small to read or play from. Use the tool on
-material you have the right to use.
 
 ## License
 

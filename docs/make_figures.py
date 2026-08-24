@@ -577,6 +577,84 @@ def figure_lay_out_pages(bars, title, artist, out):
     print(f"wrote {out}")
 
 
+# --- 5. The barline artifact ------------------------------------------------
+
+
+def figure_barline_artifact(video_path, log, out):
+    """Why a black barline reports more saturation than the coloured cursor.
+
+    HSV saturation is (max - min) / max, so the denominator collapses on dark
+    pixels and a few units of compression noise across the channels read as
+    strong colour. This is the one rival the greyscale invariant does not
+    dispose of, and it is invisible on screen — hence a figure.
+    """
+    tracked = [r for r in log if r["x"] is not None and r["boundary_y"]]
+    target = 0.42 * max(r["x"] for r in tracked)
+    rec = min(tracked, key=lambda r: abs(r["x"] - target))  # same frame as figure 2
+    frame = frames_at(video_path, [rec["frame"]])[rec["frame"]]
+
+    y = rec["boundary_y"]
+    crop = frame[:y, :]
+    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+    sat, val = hsv[:, :, 1].astype(float), hsv[:, :, 2].astype(float)
+
+    # The offender: the column with the most full-height saturation that is
+    # also dark. Searching rather than hardcoding, so this works on any video.
+    column_median = np.array([np.median(sat[:, x]) for x in range(crop.shape[1])])
+    dark = val.mean(axis=0) < 200
+    if not dark.any():
+        print(f"no dark column in frame {rec['frame']}; skipping {out.name}")
+        return
+    bar = int(np.where(dark, column_median, 0).argmax())
+    lo, hi = bar - 15, bar + 29
+
+    fig = plt.figure(figsize=(13, 6.4), dpi=110)
+    grid = fig.add_gridspec(1, 4, width_ratios=[1, 1, 1, 1.8], wspace=0.32)
+
+    for column, (image, cmap, vmax, title) in enumerate([
+        (cv2.cvtColor(crop[:, lo:hi], cv2.COLOR_BGR2RGB), None, None,
+         "what you see\na black barline"),
+        (val[:, lo:hi], "gray", 255, "V (brightness)\nthe line is near zero"),
+        (sat[:, lo:hi], "magma", 80, "S (saturation)\nthe line blazes"),
+    ]):
+        ax = fig.add_subplot(grid[0, column])
+        ax.imshow(image, cmap=cmap, vmin=0 if cmap else None, vmax=vmax,
+                  extent=[lo, hi, y, 0], aspect="auto", interpolation="nearest")
+        ax.axvline(bar, color=RED, lw=0.8, ls=":")
+        ax.set_yticks([])
+        ax.set_xticks([lo, bar, hi - 1])
+        ax.set_title(title, fontsize=9)
+
+    ax = fig.add_subplot(grid[0, 3])
+    xs = np.arange(max(0, bar - 30), min(crop.shape[1], bar + 30))
+    ax.plot(xs, column_median[xs], color=RED, lw=1.4, label="median saturation")
+    ax.plot(xs, val.mean(axis=0)[xs], color=BLACK, lw=1.4, label="mean brightness")
+    ax.axvline(bar, color=RED, lw=0.8, ls=":")
+    ax.set_xlabel("column (x)")
+    ax.legend(fontsize=8, loc="center right")
+    ax.set_title("the saturation spike is exactly\nthe brightness trough", fontsize=9)
+
+    # The arithmetic, on one real pixel of each. Not the darkest pixel of the
+    # line: at pure black every channel ties, S degenerates to 0, and the point
+    # is lost. A representative dark pixel is where the ratio misbehaves.
+    dim = np.flatnonzero((val[:, bar] > 0) & (val[:, bar] < 100))
+    row = int(dim[np.argsort(sat[dim, bar])[len(dim) // 2]]) if len(dim) else 0
+    ink = tuple(int(c) for c in crop[row, bar])
+    cursor = tuple(int(c) for c in crop[crop.shape[0] // 2, rec["x"]])
+    fig.suptitle(
+        f"frame {rec['frame']}, x = {bar}: a barline out-saturates the cursor.\n"
+        f"S is (max − min) / max, so ink BGR{ink} scores "
+        f"{int(255 * (max(ink) - min(ink)) / max(max(ink), 1))} on a channel spread of "
+        f"{max(ink) - min(ink)}, while the cursor's BGR{cursor} scores "
+        f"{int(255 * (max(cursor) - min(cursor)) / max(max(cursor), 1))} on a spread of "
+        f"{max(cursor) - min(cursor)}.",
+        fontsize=9.5,
+    )
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {out}")
+
+
 # --- Entry point ------------------------------------------------------------
 
 
@@ -588,7 +666,7 @@ def main():
         help="where to write the PNGs (default: docs/)",
     )
     parser.add_argument(
-        "--only", type=int, choices=(1, 2, 3, 4), action="append",
+        "--only", type=int, choices=(1, 2, 3, 4, 5), action="append",
         help="regenerate only this figure (repeatable)",
     )
     args = parser.parse_args()
@@ -599,7 +677,7 @@ def main():
 
     log, bars = run(args.video)
     title, artist = v.split_title(args.video.stem)
-    wanted = set(args.only or (1, 2, 3, 4))
+    wanted = set(args.only or (1, 2, 3, 4, 5))
 
     if 1 in wanted:
         figure_find_the_staff(args.video, log, args.output_dir / "step-1-find-the-staff.png")
@@ -612,6 +690,10 @@ def main():
     if 4 in wanted:
         figure_lay_out_pages(
             bars, title, artist, args.output_dir / "step-4-lay-out-pages.png"
+        )
+    if 5 in wanted:
+        figure_barline_artifact(
+            args.video, log, args.output_dir / "barline-artifact.png"
         )
 
 

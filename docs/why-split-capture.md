@@ -84,6 +84,37 @@ of under three points. A channel whose paper is a shade greyer fails
 completely, and the honest fix is to calibrate the threshold from the first
 few frames instead of hardcoding it.
 
+The third weak point is inside the invariant itself. "The staff is greyscale,
+so the cursor is the only saturated thing" is true of ink and paper, but HSV
+saturation is `(max − min) / max`, and that denominator collapses on dark
+pixels. A barline is black, so two or three units of compression noise across
+its channels read as strong colour:
+
+![A barline shown as pixels, as brightness and as saturation: black in the first two, blazing in the third](barline-artifact.png)
+
+The line scores 63 on a channel spread of three units; the cursor beside it
+scores 36 on a spread of thirty-five. The barline is an order of magnitude less
+colourful and reads nearly twice as saturated — and none of it is visible on
+screen. Measured over one video, something on the page comes within 50% of the
+cursor's peak on roughly one frame in five.
+
+It does not break the detector, for two reasons. A barline is a pixel or two
+wide, so the smoothing kernel dilutes it while leaving the cursor's forty-pixel
+band intact; and the argmax only has to pick the taller of the two, never to
+classify either. But it is why the cursor clears its rivals by a factor of two
+rather than a factor of ten, and why a plain saturation threshold could not
+replace the argmax.
+
+Taking the median down each column instead of the mean would be the more robust
+statistic — it rejects the coloured marks in the notation outright, and on the
+same video it never falls below 1.76× separation where the mean touches 1.00×.
+It is not used because it costs twenty times as much per frame, roughly
+doubling the runtime in the table below, and because it needs the cursor to
+cover more than half the column: at 76% here, that is a cliff rather than a
+slope. Clipping saturation before averaging buys most of the robustness for
+four times the cost instead of twenty, and remains the obvious thing to try
+first if a video ever does get this wrong.
+
 ## What it costs
 
 Every frame costs one HSV conversion of the staff crop, one column-wise mean,

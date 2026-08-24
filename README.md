@@ -1,7 +1,5 @@
-# video2sheet
-
-<img src="packaging/icon.png" align="right" width="110"
-     alt="The video2sheet icon: a sheet of music above the falling coloured note bars of a tutorial video.">
+<h1><img src="packaging/icon.png" width="38"
+     alt="The video2sheet icon: a sheet of music above the falling coloured note bars of a tutorial video."> video2sheet</h1>
 
 [![tests](https://github.com/tlifschitz/video2sheet/actions/workflows/ci.yml/badge.svg)](https://github.com/tlifschitz/video2sheet/actions/workflows/ci.yml)
 

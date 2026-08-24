@@ -14,6 +14,11 @@ from pathlib import Path
 ROOT = Path(SPECPATH).parent
 NAME = "Video to Sheet Music"
 
+# Drawn by packaging/make_icon.py, which is also where to change it. Both
+# files are checked in because neither runner can produce the other platform's
+# format — the Windows one has no way to write a .icns.
+ICON = str(Path(SPECPATH) / ("icon.icns" if sys.platform == "darwin" else "icon.ico"))
+
 # matplotlib is a runtime dependency of the pipeline for exactly two font
 # files, which the title block is typeset with. Carrying the rest of it — the
 # backends, the sample data, the test images — would add tens of megabytes to
@@ -49,6 +54,7 @@ executable = EXE(
     analysis.scripts,
     exclude_binaries=True,
     name=NAME,
+    icon=ICON,
     console=False,  # no terminal window behind the app
     disable_windowed_traceback=False,
     argv_emulation=sys.platform == "darwin",  # let a dropped file arrive as argv
@@ -64,6 +70,7 @@ if sys.platform == "darwin":
     app = BUNDLE(
         collection,
         name=f"{NAME}.app",
+        icon=ICON,
         bundle_identifier="com.tlifschitz.video2sheet",
         info_plist={
             "NSHighResolutionCapable": True,

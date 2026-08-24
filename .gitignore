@@ -11,6 +11,7 @@ sheets/
 # Intermediate frames dumped by --dump-bars
 *.png
 !docs/*.png
+!packaging/icon.png
 sheet_frames/
 
 # Python

@@ -12,6 +12,18 @@ def staff_lines(count, height=300, width=1200):  # noqa: D103
     return [np.full((height, width), 255, np.uint8) for _ in range(count)]
 
 
+def engraved(height=300, width=1200, left=100, right=1100):
+    """One staff line with five printed staff lines across `left`..`right`.
+
+    `staff_lines` above is blank paper, which is all the packing arithmetic
+    needs. Anything that has to *find* a staff needs one drawn.
+    """
+    bar = np.full((height, width), 255, np.uint8)
+    for row in range(80, 180, 20):
+        bar[row : row + 3, left:right] = 0
+    return bar
+
+
 class TestBuildPages:
     def test_no_bars_yields_no_pages(self):
         """main() relies on this to report a failed extraction instead of
@@ -61,6 +73,70 @@ class TestBuildPages:
         # The first page opens with the title block, the rest with a margin.
         headers = v.TITLE_BLOCK_HEIGHT_PX + v.TOP_MARGIN_PX * (len(pages) - 1)
         assert sum(p.shape[0] for p in pages) - headers == count * line_height
+
+
+class TestStaffSpan:
+    """Finding the staff itself, which is what the lines are aligned by."""
+
+    def test_finds_the_printed_staff(self):
+        assert v.staff_span(engraved(left=100, right=1100)) == (100, 1099)
+
+    def test_ignores_everything_that_is_not_a_staff_line(self):
+        """Barlines are vertical and beams are short, so the opening should
+        erase both rather than let them stretch the span outwards."""
+        bar = engraved(left=100, right=1100)
+        bar[80:180, 40:44] = 0  # a barline out in the margin
+        bar[200:210, 1120:1180] = 0  # a beam past the end of the staff
+        assert v.staff_span(bar) == (100, 1099)
+
+    def test_blank_paper_has_no_staff(self):
+        """The caller falls back to a plain resize on this, so it must be
+        None rather than a span covering the whole width."""
+        assert v.staff_span(staff_lines(1)[0]) is None
+
+
+class TestStaffAlignment:
+    """Engravers indent a system to clear a tempo mark or a coda sign. Scaling
+    the whole frame to the page keeps the indent and prints that system short.
+    """
+
+    def test_an_indented_line_is_brought_to_the_same_width(self):
+        lines = [engraved(), engraved(left=160, right=1060), engraved()]
+        spans = [v.staff_span(line) for line in lines]
+        target = v._align_target(lines, spans)
+
+        printed = [
+            v.staff_span(v._to_page_width(line, span, target))
+            for line, span in zip(lines, spans)
+        ]
+        for left, right in printed[1:]:
+            assert abs(left - printed[0][0]) <= 2
+            assert abs(right - printed[0][1]) <= 2
+
+    def test_build_pages_aligns_the_staves_it_stacks(self):
+        """Measured on the page rather than on one line: three staves that
+        did not line up would leave a span wider than any one of them."""
+        mixed = v.build_pages(
+            [engraved(), engraved(left=160, right=1060), engraved()],
+            "Title",
+            balance=False,
+        )[0]
+        even = v.build_pages([engraved() for _ in range(3)], "Title", balance=False)[0]
+
+        left, right = v.staff_span(mixed)
+        expected_left, expected_right = v.staff_span(even)
+        assert abs(left - expected_left) <= 2
+        assert abs(right - expected_right) <= 2
+
+    def test_a_misdetected_span_falls_back_to_the_plain_scale(self):
+        """A span nowhere near the median is a detection failure, not an
+        indent, and scaling by it would blow the line up off the page."""
+        lines = [engraved() for _ in range(4)] + [engraved(left=100, right=200)]
+        spans = [v.staff_span(line) for line in lines]
+        target = v._align_target(lines, spans)
+
+        printed = v._to_page_width(lines[-1], spans[-1], target)
+        assert printed.shape == (int(300 * (v.A4_WIDTH_PX / 1200)), v.A4_WIDTH_PX)
 
 
 class TestSavePdf:

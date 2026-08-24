@@ -88,7 +88,10 @@ The pipeline solves this with timing rather than inpainting:
    43 and 31 in the frames they were cut from.*
 
 4. **Lay out pages.** Staff lines are scaled to A4 width at 300 DPI and stacked
-   until the next one would overflow the page, then a new page starts.
+   until the next one would overflow the page, then a new page starts. Each
+   line is scaled by the staff it contains rather than by the frame, so a
+   system the engraver indented — to clear the opening tempo mark, or a coda
+   sign — still prints the same width as the rest.
 
    ![Three pages of the finished score under each layout mode, with the margins marked, beside a chart of how many staff lines land on each page](docs/step-4-lay-out-pages.png)
 

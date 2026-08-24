@@ -45,6 +45,18 @@ DEBUG_GIF_WIDTH = 640
 DEBUG_GIF_FRAME_MS = 120
 DEBUG_GIF_COLORS = 64
 
+# --- Staff alignment --------------------------------------------------------
+# Engravers indent a system to make room for whatever hangs off its left edge:
+# a tempo mark on the opening line, a coda sign further in. The video shows
+# that indent, so the captured lines do not all span the same width, and the
+# printed score comes out with a couple of visibly short systems among the
+# rest. Scaling each line until its staff matches the median span puts them
+# back in step.
+STAFF_DARK_LEVEL = 200  # print is grey, not black, by the time it is on video
+STAFF_RUN_RATIO = 0.25  # a dark run this long across the crop can only be a staff line
+STAFF_COVERAGE_RATIO = 0.5  # ...and the staff spans the columns carrying most of them
+MAX_ALIGN_SCALE = 1.25  # a span further off the median than this is a misdetection
+
 # --- Page layout ------------------------------------------------------------
 A4_WIDTH_PX = 2480  # A4 at 300 DPI
 A4_HEIGHT_PX = 3508
@@ -113,6 +125,30 @@ def detect_pentagram_boundary(frame):
     brightness_drop_y = int(np.argmax(np.abs(diffs[k:-k])) + k)
 
     return average_corner_brightness, brightness_drop_y
+
+
+def staff_span(bar):
+    """Return (left, right): the columns the staff lines occupy, or None.
+
+    The staff lines are the only things in a captured line that run most of
+    the way across it, so an opening with a long horizontal kernel erases
+    everything else — noteheads, stems, the barlines, which are vertical —
+    and leaves the lines themselves restored to their full length. The staff
+    is then the stretch of columns most of them cover; a relative threshold,
+    so one stray long run cannot drag an edge outwards.
+    """
+    width = bar.shape[1]
+    # Odd, so the kernel's anchor sits on its centre: an even one leaves the
+    # opening a pixel off from the run it restored.
+    run = max(3, int(width * STAFF_RUN_RATIO)) | 1
+    kernel = np.ones((1, run), np.uint8)
+    lines = cv2.morphologyEx((bar < STAFF_DARK_LEVEL).astype(np.uint8), cv2.MORPH_OPEN, kernel)
+
+    coverage = lines.sum(axis=0)
+    if not coverage.max():
+        return None
+    columns = np.flatnonzero(coverage >= coverage.max() * STAFF_COVERAGE_RATIO)
+    return int(columns[0]), int(columns[-1])
 
 
 def draw_overlay(frame, boundary_y, playhead_x, th1, th2, thickness=2):
@@ -491,18 +527,79 @@ def _justify(head, lines):
     return np.vstack(stacked)
 
 
+def _align_target(bars, spans):
+    """Where the staff should land on the page: (left, right) in page pixels.
+
+    Taken as a fraction of each line's own width, so lines captured at
+    different resolutions still agree, and as a median rather than a mean, so
+    the handful of indented lines this exists to fix cannot move the target
+    they are being fitted to. None if no line yielded a staff.
+    """
+    found = [
+        (span[0] / bar.shape[1], span[1] / bar.shape[1])
+        for bar, span in zip(bars, spans)
+        if span is not None
+    ]
+    if not found:
+        return None
+    left, right = (float(np.median(edge)) for edge in zip(*found))
+    return left * A4_WIDTH_PX, right * A4_WIDTH_PX
+
+
+def _to_page_width(bar, span=None, target=None):
+    """Scale one staff line to A4 width, matching the staff to `target`.
+
+    Engravers indent a system to clear what hangs off its left edge — the
+    tempo mark opening a piece, a coda sign later on — and scaling the whole
+    frame to the page keeps that indent, printing those systems visibly short.
+    Scaling by the staff instead brings every system to one width. The scale
+    is uniform, so noteheads are not stretched and the staves come out at one
+    size as well as one width, and whatever sits in the margin travels with
+    the system rather than being cropped off.
+
+    Falls back to the plain scale-to-page for a line with no staff found, or
+    one whose span is far enough off the median to be a misdetection rather
+    than an indent.
+    """
+    height, width = bar.shape
+    plain = A4_WIDTH_PX / width
+
+    if span is not None and target is not None:
+        left, right = target
+        scale = (right - left) / (span[1] - span[0])
+        if 1 / MAX_ALIGN_SCALE < scale / plain < MAX_ALIGN_SCALE:
+            # The half-pixel term is cv2.resize's sampling convention, which
+            # warpAffine does not share: without it a line needing no
+            # correction at all would still come out shifted half a pixel.
+            offset = (scale - 1) / 2
+            matrix = np.float32(
+                [[scale, 0, left - span[0] * scale + offset], [0, scale, offset]]
+            )
+            return cv2.warpAffine(
+                bar,
+                matrix,
+                (A4_WIDTH_PX, int(height * scale)),
+                flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=255,
+            )
+
+    return cv2.resize(bar, (A4_WIDTH_PX, int(height * plain)), interpolation=cv2.INTER_LINEAR)
+
+
 def build_pages(bars, title, artist=None, balance=True):
     """Scale staff lines to A4 width and stack them into pages.
+
+    The lines are scaled by their staves rather than by the frame, so an
+    indented system prints the same width as the rest — see `_to_page_width`.
 
     With `balance` the lines are spread evenly over the pages and the
     remaining height is distributed between them; without it, pages are
     packed as full as they go.
     """
-    resized = []
-    for bar in bars:
-        h, w = bar.shape
-        new_h = int(h * (A4_WIDTH_PX / w))
-        resized.append(cv2.resize(bar, (A4_WIDTH_PX, new_h), interpolation=cv2.INTER_LINEAR))
+    spans = [staff_span(bar) for bar in bars]
+    target = _align_target(bars, spans)
+    resized = [_to_page_width(bar, span, target) for bar, span in zip(bars, spans)]
 
     if not resized:
         return []

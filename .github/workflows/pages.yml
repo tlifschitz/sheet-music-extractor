@@ -57,7 +57,12 @@ jobs:
           done
           exit $missing
 
+      # enablement: true turns Pages on via the API if it is off. Without it
+      # the very first run of this workflow fails with "Get Pages site failed"
+      # until someone flips Settings -> Pages -> Source by hand.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v4
         with:

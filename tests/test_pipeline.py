@@ -19,6 +19,7 @@ from conftest import (
     CURSOR_BGR,
     DETECTED_BOUNDARY,
     HEIGHT,
+    SWEEP_POSITIONS,
     WIDTH,
     peak_column_saturation,
     write_frames,
@@ -141,6 +142,42 @@ class TestCommandLine:
         monkeypatch.setattr(sys, "argv", ["video2sheet", str(path), "--no-open"])
         with pytest.raises(SystemExit, match="--debug-gif"):
             v.main()
+
+
+class TestObserver:
+    """The observer feeds docs/make_figures.py.
+
+    The figures state, in print, where the detector armed and fired. If the
+    hook ever stopped matching the state machine the figures would go quietly
+    wrong, which is worse than not having them.
+    """
+
+    def test_reports_every_decoded_frame(self, tutorial_video, sweeps):
+        seen = []
+        v.extract_bars(tutorial_video, observer=seen.append)
+
+        assert [r["frame"] for r in seen] == list(range(1, len(seen) + 1))
+        assert len(seen) == sweeps * len(SWEEP_POSITIONS)
+
+    def test_reports_one_arm_and_one_fire_per_sweep_in_order(
+        self, tutorial_video, sweeps
+    ):
+        seen = []
+        v.extract_bars(tutorial_video, observer=seen.append)
+
+        fired = [e for r in seen for e in r["events"] if e in ("arm", "fire")]
+        assert fired == ["arm", "fire"] * sweeps
+
+    def test_reports_the_signals_the_figures_plot(self, tutorial_video):
+        seen = []
+        v.extract_bars(tutorial_video, observer=seen.append)
+
+        armed = next(r for r in seen if "arm" in r["events"])
+        assert armed["boundary_y"] == DETECTED_BOUNDARY
+        assert armed["brightness"] > v.MIN_CORNER_BRIGHTNESS
+        assert armed["x"] > round(WIDTH * v.PLAYHEAD_ARM_RATIO)
+        # `state` is what the frame left behind, so an armed frame reads 2.
+        assert armed["state"] == 2
 
 
 class TestDebugGif:

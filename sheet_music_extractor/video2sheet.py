@@ -151,11 +151,18 @@ def save_debug_gif(frames, output_path):
     print(f"Wrote {len(frames)} debug frames to {output_path}")
 
 
-def extract_bars(video_path, dump_dir=None, debug_frames=None):
+def extract_bars(video_path, dump_dir=None, debug_frames=None, observer=None):
     """Decode the video and return one greyscale image per staff line.
 
     Pass a list as `debug_frames` to collect overlay stills along the way; the
     video is sampled down to roughly DEBUG_GIF_MAX_FRAMES of them.
+
+    Pass a callable as `observer` to watch the state machine run: it is handed
+    one dict per decoded frame — frame, brightness, boundary_y, x, state,
+    events — and unlike the reel it sees every frame, not a sample. `events`
+    is a list because the state checks below are a chain of ifs, so a single
+    frame can legitimately arm and fire. This is what docs/make_figures.py
+    plots.
     """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -179,12 +186,26 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None):
 
     state = 0
     boundary_y = None
-    bar_position = None
     cut_right = None
     frame_idx = 0
 
-    def record(frame, boundary_y, playhead_x):
-        """Sample this frame into the debug reel, if one is being collected."""
+    def record(frame, boundary_y, playhead_x, brightness, events):
+        """Report this frame to the observer, and sample it into the reel.
+
+        The observer sees every frame; the reel is sampled. Both are read at
+        the end of a frame, so `state` is the state the frame left behind.
+        """
+        if observer is not None:
+            observer(
+                {
+                    "frame": frame_idx,
+                    "brightness": brightness,
+                    "boundary_y": boundary_y,
+                    "x": playhead_x,
+                    "state": state,
+                    "events": events,
+                }
+            )
         if debug_frames is None or frame_idx % debug_step:
             return
         view = draw_overlay(frame.copy(), boundary_y, playhead_x, th1, th2)
@@ -197,6 +218,10 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None):
         if not ret:
             break
         frame_idx += 1
+        # Reset per frame: a stale position from an earlier sweep would be
+        # reported as this frame's, and drawn as this frame's playhead.
+        bar_position = None
+        events = []
 
         if state == 0:
             average_corner_brightness, brightness_drop_y = detect_pentagram_boundary(frame)
@@ -210,6 +235,7 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None):
                 # waits for the playhead to wrap left first, which costs
                 # nothing when the staff is acquired at the start of a sweep.
                 state = 3
+                events.append("acquire")
                 print(f"Found pentagram boundary {boundary_y}")
         else:
             average_corner_brightness, current_boundary_y = detect_pentagram_boundary(frame)
@@ -222,7 +248,8 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None):
                 )
                 boundary_y = None
                 state = 0
-                record(frame, None, None)
+                events.append("lost")
+                record(frame, None, None, average_corner_brightness, events)
                 continue
             if abs(current_boundary_y - boundary_y) > BOUNDARY_JITTER_TOLERANCE:
                 print(f"Boundary moved from {boundary_y} to {current_boundary_y}, re-anchoring")
@@ -233,6 +260,7 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None):
                 # playhead to wrap before starting a fresh sweep.
                 cut_right = None
                 state = 3
+                events.append("reanchor")
 
             staff = frame[:boundary_y, :]
             bar_position = get_bar_position(staff, kernel_size)
@@ -246,6 +274,7 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None):
                 if state == 1 and bar_position > th1:
                     cut_right = staff[:, mid:].copy()
                     state = 2
+                    events.append("arm")
                 if state == 2 and bar_position > th2:
                     cut_left = staff[:, :mid].copy()
                     merged = np.hstack((cut_left, cut_right))
@@ -254,10 +283,12 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None):
                         cv2.imwrite(str(dump_dir / f"{len(bars):03d}.png"), merged)
                     print(f"frame {frame_idx}: captured staff line {len(bars)}")
                     state = 3
+                    events.append("fire")
                 if state == 3 and bar_position < th1:
                     state = 1
+                    events.append("wrap")
 
-        record(frame, boundary_y, bar_position)
+        record(frame, boundary_y, bar_position, average_corner_brightness, events)
 
     cap.release()
     return bars, trace

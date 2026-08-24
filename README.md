@@ -1,5 +1,8 @@
 # video2sheet
 
+<img src="packaging/icon.png" align="right" width="110"
+     alt="The video2sheet icon: a sheet of music above the falling coloured note bars of a tutorial video.">
+
 [![tests](https://github.com/tlifschitz/video2sheet/actions/workflows/ci.yml/badge.svg)](https://github.com/tlifschitz/video2sheet/actions/workflows/ci.yml)
 
 You play piano, you read sheet music, and one day you found an arrangement you

@@ -32,10 +32,18 @@ dynamic = ["dependencies"]
 # `-r requirements.txt`, which setuptools hands straight to the PEP 508
 # parser and which fails there. One duplicated pin beats a broken build.
 dev = ["pytest>=8.0"]
+# The frozen app. Not needed to run or develop the pipeline, only to build the
+# download for people who have no Python.
+package = ["pyinstaller>=6.10"]
 
 [project.scripts]
 video2sheet = "sheet_music_extractor.video2sheet:main"
 video2sheet-fetch = "sheet_music_extractor.youtube:main"
+
+[project.gui-scripts]
+# gui-scripts, not scripts: on Windows this builds a launcher with no console
+# window attached, which is the whole point for a double-clicked app.
+video2sheet-app = "sheet_music_extractor.gui:main"
 
 [project.urls]
 Homepage = "https://github.com/tlifschitz/sheet-music-extractor"

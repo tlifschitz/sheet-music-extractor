@@ -24,6 +24,10 @@ __pycache__/
 # pytest
 .pytest_cache/
 
+# Frozen app builds
+packaging/build/
+packaging/dist/
+
 # Packaging artefacts
 build/
 dist/

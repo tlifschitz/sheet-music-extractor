@@ -294,22 +294,39 @@ def extract_bars(video_path, dump_dir=None, debug_frames=None, observer=None):
     return bars, trace
 
 
+def _font_dirs():
+    """Where the DejaVu faces might live, most specific first.
+
+    Two different worlds. A normal install has matplotlib, which ships DejaVu,
+    so the score needs no system font lookup and renders identically here and
+    in CI. The bundled app has no matplotlib — carrying the whole library for
+    two files would put tens of megabytes on a download aimed at someone on a
+    home connection — so PyInstaller drops the faces beside the executable.
+    """
+    bundle = getattr(sys, "_MEIPASS", None)
+    if bundle:
+        yield Path(bundle) / "fonts"
+    try:
+        import matplotlib
+
+        yield Path(matplotlib.__file__).parent / "mpl-data" / "fonts" / "ttf"
+    except ImportError:
+        pass
+
+
 @lru_cache(maxsize=None)
 def _font(size, bold=False):
     """A serif face that is identical on every platform.
 
-    matplotlib ships DejaVu, so this needs no system font lookup and renders
-    the same way locally and in CI. Falls back to Pillow's built-in scalable
-    font if matplotlib is not installed.
+    Falls back to Pillow's built-in scalable font if neither source is there,
+    which keeps a missing font from being fatal to an otherwise good score.
     """
-    try:
-        import matplotlib
-
-        name = "DejaVuSerif-Bold.ttf" if bold else "DejaVuSerif.ttf"
-        path = Path(matplotlib.__file__).parent / "mpl-data" / "fonts" / "ttf" / name
-        return ImageFont.truetype(str(path), size)
-    except Exception:
-        return ImageFont.load_default(size=size)
+    name = "DejaVuSerif-Bold.ttf" if bold else "DejaVuSerif.ttf"
+    for directory in _font_dirs():
+        path = directory / name
+        if path.exists():
+            return ImageFont.truetype(str(path), size)
+    return ImageFont.load_default(size=size)
 
 
 def split_title(stem):

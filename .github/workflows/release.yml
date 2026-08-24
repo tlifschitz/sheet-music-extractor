@@ -1,0 +1,111 @@
+name: app
+
+# Builds the double-clickable app for people who have no Python, no git and no
+# terminal, and attaches it to the GitHub release for the tag. Also runnable by
+# hand, so a packaging change can be proved before a tag is cut.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # the release job attaches the builds to the tag
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            asset: Video-to-Sheet-Music-macOS
+          - os: windows-latest
+            asset: Video-to-Sheet-Music-Windows
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements*.txt
+            pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pip install -e . --no-deps
+
+      - name: Build the app
+        run: >
+          pyinstaller --noconfirm --clean
+          --distpath packaging/dist --workpath packaging/build
+          packaging/video2sheet.spec
+
+      # A frozen build is exactly where imports go missing and data files land
+      # in the wrong directory, and none of it shows until someone opens the
+      # app. Cheaper to find it here. There is no video on the runner, so this
+      # checks that it starts, imports, and finds its bundled font.
+      - name: Smoke-test the build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          "packaging/dist/Video to Sheet Music.app/Contents/MacOS/Video to Sheet Music" --self-test
+
+      - name: Smoke-test the build (Windows)
+        if: runner.os == 'Windows'
+        # Start-Process -Wait because the exe is built for the windows
+        # subsystem and PowerShell would otherwise not wait for it. Its stdout
+        # goes nowhere for the same reason, so the exit code is the signal.
+        run: |
+          $exe = "packaging/dist/Video to Sheet Music/Video to Sheet Music.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--self-test" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "self-test failed ($($p.ExitCode))" }
+
+      # ditto rather than zip: it preserves the bundle's symlinks and metadata,
+      # which a plain zip mangles badly enough to break the .app.
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "packaging/dist/Video to Sheet Music.app" "${{ matrix.asset }}.zip"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Compress-Archive -Path "packaging/dist/Video to Sheet Music" `
+            -DestinationPath "${{ matrix.asset }}.zip"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}.zip
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip
+          body: |
+            Download the file for your computer, unzip it, and open it.
+
+            **macOS** — the first time, right-click the app and choose **Open**,
+            then confirm. macOS blocks double-clicking apps it has not seen
+            before; this one is unsigned, so it is one of them.
+
+            **Windows** — if a blue "Windows protected your PC" box appears,
+            click **More info**, then **Run anyway**, for the same reason.
+
+            Then choose a piano tutorial video. The PDF is saved next to it.

@@ -15,6 +15,21 @@ printable PDF.
 
 One video in, a printable PDF out.
 
+## Just want the PDF?
+
+**[Download the app](https://github.com/tlifschitz/sheet-music-extractor/releases/latest)**
+— there is nothing to install. Unzip it, open it, choose your video, and the
+PDF appears next to it.
+
+The first time you open it, your computer will warn you that it does not
+recognise the app. It is unsigned, which is the same thing every small
+free tool has to live with:
+
+- **macOS** — right-click the app, choose **Open**, then confirm.
+- **Windows** — click **More info**, then **Run anyway**.
+
+Everything below is for people who want the command line, or the reasoning.
+
 ## How it works
 
 The hard part is not reading the staff — it is already a clean, high-contrast
@@ -95,6 +110,9 @@ see [**Why split capture**](docs/why-split-capture.md).
 
 ## Install
 
+For the command line. (For the app, see
+[Just want the PDF?](#just-want-the-pdf) above.)
+
 ```bash
 pipx install git+https://github.com/tlifschitz/sheet-music-extractor
 ```
@@ -137,6 +155,9 @@ it goes, which trades even pages for fewer page turns.
 | `--no-open` | do not open the PDF when finished |
 | `--title` / `--artist` | override the heading, when the filename does not parse cleanly |
 | `--dense` | pack pages as full as they go, instead of spreading lines evenly |
+
+`video2sheet-app` opens the window version: a file picker, a progress bar and
+no flags. It is the same pipeline, and it is what the download above bundles.
 
 `video2sheet-fetch` pulls source videos via `yt-dlp` — either a single URL, or
 a channel filtered by title regex or random sample:

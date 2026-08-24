@@ -68,3 +68,6 @@ jobs:
         run: |
           /tmp/pkgcheck/bin/video2sheet --help
           /tmp/pkgcheck/bin/video2sheet-fetch --help
+          # Not --help: it opens a window and would hang the runner. That the
+          # launcher exists is enough — the release workflow actually runs it.
+          test -x /tmp/pkgcheck/bin/video2sheet-app

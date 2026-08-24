@@ -1,22 +1,21 @@
-# The split-capture trick
+# Why split capture
 
-*How this project reconstructs a clean score from a video that never shows one.*
-
-## The problem
+*Why this project reconstructs the score by timing rather than by repair.*
 
 Piano tutorial videos scroll a staff across the top of the frame while notes
-fall onto a keyboard below. The staff is already a clean, high-contrast
-render — far better than a photograph of paper. Reading it is not the hard
-part.
+fall onto a keyboard below, with a coloured cursor drawn on top of the music.
+Grab any single frame and some bars sit under a bar of colour.
 
-The hard part is the playhead. A coloured cursor sweeps left to right across
-the staff, and it is drawn *on top of* the music. Grab any single frame and
-some bars are obscured by a translucent bar of colour.
+This project never repairs them. It grabs the right half of the staff while the
+cursor is still on the left, the left half once the cursor has moved past, and
+stitches the two — each half was clean at the moment it was taken. The README's
+[How it works](../README.md#how-it-works) shows that happening, frame by frame,
+with every signal the detector uses plotted alongside.
 
-![The detector running](detector.gif)
-
-So the question is not "how do I read the staff", it is "how do I get a
-picture of the staff with nothing on top of it".
+What follows is the argument rather than the mechanism. The question was never
+"how do I read the staff" — the staff is already a clean, high-contrast render,
+far better than a photograph of paper. The question is "how do I get a picture
+of the staff with nothing on top of it".
 
 ## Three approaches that do not work
 
@@ -50,29 +49,6 @@ the cursor is on the right, the left half is clean.
 **Neither half needs to be clean at the same time.** They only need to be
 clean at *some* time, and we can remember them.
 
-## The trick
-
-Two captures per sweep, at two different moments:
-
-| When the cursor passes… | Capture | Why it is clean |
-|---|---|---|
-| **25%** of the frame width | the **right** half | the cursor is still on the left |
-| **85%** of the frame width | the **left** half | the cursor has moved past it |
-
-`np.hstack` the two halves and you have a complete staff line with the cursor
-in neither. Not repaired, not reconstructed, not interpolated — never
-occluded in the first place.
-
-```python
-if state == 1 and bar_position > th1:
-    cut_right = staff[:, mid:].copy()      # cursor still on the left
-    state = 2
-if state == 2 and bar_position > th2:
-    cut_left = staff[:, :mid].copy()       # cursor now past the middle
-    merged = np.hstack((cut_left, cut_right))
-    state = 3
-```
-
 The seam is exact. Because the staff is static within a sweep, the two halves
 come from the same rendering of the same music — the left edge of one lines up
 with the right edge of the other to the pixel, with nothing duplicated and
@@ -91,45 +67,6 @@ cursor to reach the very edge risks missing the moment entirely: the sweep
 ends and the next screenful is drawn between two sampled frames. At 85% there
 is comfortable margin, and the cursor is already well clear of the left half.
 
-## Finding the playhead without tuning colours
-
-The obvious way to locate a coloured cursor is a colour range in HSV, or
-template matching. Both need per-video tuning, because every channel picks its
-own cursor colour.
-
-There is a simpler invariant: **the staff is greyscale.** Printed music is
-black on white. The cursor is the only strongly saturated thing anywhere in
-the crop, whatever colour the channel chose.
-
-So: convert to HSV, take the mean of the saturation channel down each column,
-smooth slightly, and the peak is the cursor.
-
-```python
-hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-column_saturation = np.mean(hsv[:, :, 1], axis=0)
-x = np.argmax(np.convolve(column_saturation, kernel, mode="same"))
-```
-
-One pass, no per-video colour tuning, works for a blue cursor or a red one. If
-the peak never rises above a floor, there is no cursor on screen and the frame
-is skipped — which doubles as the check for "is this even a staff".
-
-## Finding where the staff ends
-
-Everything above assumes we know which part of the frame is sheet music and
-which is falling notes. That boundary is found the same way — by looking for
-the simplest invariant rather than the most obvious feature.
-
-Only a narrow strip at the **left edge** of the frame is inspected. The mean
-brightness of that strip answers "are we looking at white paper at all, or at
-a title card?". Within it, the row of sharpest brightness change is the bottom
-edge of the sheet music, because paper is bright and the falling-note area is
-dark.
-
-Checking a 20-pixel strip instead of the whole frame is not just faster; it is
-*more* robust. The left margin of a staff is empty — no notes, no lyrics, no
-piano roll — so the brightness profile there is close to a step function.
-
 ## Where it breaks
 
 The technique rests on one assumption: **the staff is static within a sweep.**
@@ -139,9 +76,11 @@ from different music and the stitch is visibly wrong.
 It does not hold if the video scrolls continuously rather than a screenful at
 a time. Those videos need an entirely different approach.
 
-The brightness threshold is the other weak point. It is a fixed constant, and
-on one test video the paper measured 228.6 against a threshold of 230 — the
-detector survived by 1.4 points. A video with slightly greyer paper fails
+The brightness threshold is the other weak point. It is a fixed absolute
+constant, so how much room it leaves depends entirely on how a channel renders
+paper. Across the eight videos this was developed against, seven measure 247
+to 253 against a floor of 230 — but *The Run And Go* measures 232.8, a margin
+of under three points. A channel whose paper is a shade greyer fails
 completely, and the honest fix is to calibrate the threshold from the first
 few frames instead of hardcoding it.
 

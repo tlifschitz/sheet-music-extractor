@@ -88,9 +88,10 @@ Throughput is roughly 160 frames/second at 1080p and 1400 at 360p — the work
 scales with pixel count. A four-minute clip takes anywhere from 6 seconds to a
 minute and a half, depending on its resolution and frame rate.
 
-For the reasoning behind the design — why inpainting and frame compositing
-both fail here, why the thresholds are asymmetric, and where the technique
-breaks — see [**The split-capture trick**](docs/the-split-capture-trick.md).
+The figures show what the detector does; they do not argue for it. For why
+inpainting and frame compositing both fail here, why the two thresholds are
+asymmetric rather than symmetric, where the technique breaks and what it costs,
+see [**Why split capture**](docs/why-split-capture.md).
 
 ## Install
 
